@@ -51,6 +51,7 @@ python -m uvicorn main:app --reload
   ...
 ]
 ```
+
 ## API 사용법
 ### GET /ebs-volumes
 현재 계정의 모든 S3 버킷 정보를 반환합니다.
@@ -71,6 +72,69 @@ python -m uvicorn main:app --reload
     "availability_zone": "ap-northeast-2b",
     "encrypted": false,
     "name": "data-volume-1"
+  }
+]
+
+```
+
+
+## API 사용법
+### GET /efs-filesystems
+EFS (Elastic File System) 리소스를 조회합니다.
+
+응답예시
+```json
+[
+  {
+    "file_system_id": "fs-0a9ce49d363637f10",
+    "creation_time": "2025-10-03T12:52:38+09:00",
+    "size_in_bytes": {
+      "Timestamp": "2025-10-04T06:23:34Z",
+      "Value": 6144,
+      "ValueInArchive": 0,
+      "ValueInIA": 0,
+      "ValueInStandard": 6144
+    },
+    "region": "ap-northeast-2"
+  }
+]
+
+```
+
+
+## API 사용법
+### GET /fsx-filesystems
+FSx (Windows, Lustre, NetApp 등) 파일 시스템을 조회합니다.
+
+응답예시
+```json
+[
+  {
+    "file_system_id": "fsx-0123456789abcdef0",
+    "storage_capacity": 1200,
+    "type": "WINDOWS",
+    "lifecycle": "AVAILABLE",
+    "region": "us-west-2"
+  }
+]
+
+```
+
+
+## API 사용법
+### GET /rds-instances
+Amazon RDS 인스턴스의 정보를 조회합니다. RDS는 MySQL, PostgreSQL 등 다양한 데이터베이스 엔진을 지원하는 AWS의 관리형 데이터베이스 서비스입니다.
+
+응답예시
+```json
+[
+  {
+    "db_instance_identifier": "dspmeksstack-dspmdatabasea69d27a7-ykujqpxuyvw0",
+    "engine": "postgres",
+    "allocated_storage": 20,
+    "status": "available",
+    "endpoint_address": "dspmeksstack-dspmdatabasea69d27a7-ykujqpxuyvw0.cdsikyuewe0q.ap-northeast-2.rds.amazonaws.com",
+    "class": "db.t3.micro"
   }
 ]
 
