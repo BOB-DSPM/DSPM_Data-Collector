@@ -90,3 +90,111 @@ def get_rds_instances():
     """
     df = pd.read_sql(query, engine)
     return df.to_dict(orient="records")
+
+@app.get("/dynamodb-tables")
+def get_dynamodb_tables():
+    query = """
+    select
+      name,
+      table_status,
+      read_capacity,
+      write_capacity,
+      item_count,
+      billing_mode,
+      region
+    from
+      aws_dynamodb_table
+    order by
+      name;
+    """
+    df = pd.read_sql(query, engine)
+    return df.to_dict(orient="records")
+
+@app.get("/redshift-clusters")
+def get_redshift_clusters():
+    query = """
+    select
+      cluster_identifier,
+      node_type,
+      number_of_nodes,
+      cluster_status,
+      db_name,
+      endpoint ->> 'address' as endpoint
+    from
+      aws_redshift_cluster
+    order by
+      cluster_identifier;
+    """
+    df = pd.read_sql(query, engine)
+    return df.to_dict(orient="records")
+
+@app.get("/rds-snapshots")
+def get_rds_snapshots():
+    query = """
+    select
+      db_snapshot_identifier,
+      db_instance_identifier,
+      status,
+      engine,
+      create_time,
+      allocated_storage,
+      region
+    from
+      aws_rds_db_snapshot
+    order by
+      create_time desc;
+    """
+    df = pd.read_sql(query, engine)
+    return df.to_dict(orient="records")
+
+@app.get("/elasticache-clusters")
+def get_elasticache_clusters():
+    query = """
+    select
+      cache_cluster_id,
+      engine,
+      engine_version,
+      cache_node_type,
+      num_cache_nodes,
+      cache_cluster_status,
+      region
+    from
+      aws_elasticache_cluster
+    order by
+      cache_cluster_id;
+    """
+    df = pd.read_sql(query, engine)
+    return df.to_dict(orient="records")
+
+@app.get("/glacier-vaults")
+def get_glacier_vaults():
+    query = """
+    select
+      vault_name,
+      creation_date,
+      vault_arn,
+      number_of_archives,
+      size_in_bytes
+    from
+      aws_glacier_vault
+    order by
+      vault_name;
+    """
+    df = pd.read_sql(query, engine)
+    return df.to_dict(orient="records")
+
+@app.get("/backup-plans")
+def get_backup_plans():
+    query = """
+    select
+      name,
+      backup_plan_id,
+      creation_date,
+      region
+    from
+      aws_backup_plan
+    order by
+      creation_date desc;
+    """
+    df = pd.read_sql(query, engine)
+    return df.to_dict(orient="records")
