@@ -21,3 +21,20 @@ def get_s3_buckets():
     """
     df = pd.read_sql(query, engine)
     return df.to_dict(orient="records")
+
+@app.get("/ebs-volumes")
+def get_ebs_volume():
+    query = """
+        select
+        volume_id,
+        size,
+        availability_zone,
+        encrypted,
+        tags ->> 'Name' as name
+        from
+        aws_ebs_volume
+        order by
+        availability_zone, volume_id;
+    """
+    df = pd.read_sql(query, engine)
+    return df.to_dict(orient="records")

@@ -51,6 +51,30 @@ python -m uvicorn main:app --reload
   ...
 ]
 ```
+## API 사용법
+### GET /ebs-volumes
+현재 계정의 모든 S3 버킷 정보를 반환합니다.
+
+응답예시
+```json
+[
+  {
+    "volume_id": "vol-0d30006b46f00b2a6",
+    "size": 20,
+    "availability_zone": "ap-northeast-2a",
+    "encrypted": false,
+    "name": null
+  },
+  {
+    "volume_id": "vol-0e2a1db498ec621a3",
+    "size": 20,
+    "availability_zone": "ap-northeast-2b",
+    "encrypted": false,
+    "name": "data-volume-1"
+  }
+]
+
+```
 
 ## 주의사항
 반드시 steampipe service start 로 로컬 Steampipe 서버가 실행 중이어야 합니다.
