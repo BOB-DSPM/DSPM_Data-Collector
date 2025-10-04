@@ -244,6 +244,86 @@ AWS Backup 서비스에서 정의된 백업 계획(Backup Plan)을 조회합니�
 ]
 ```
 
+## GET api/feature-groups
+
+SageMaker Feature Store의 Feature Group 정보를 조회합니다.  
+Feature Group은 ML 학습/예측 시 공통적으로 사용하는 피처 데이터를 관리하는 리소스입니다.
+
+응답 예시:
+```json
+[
+  {
+    "feature_group_name": "customer-churn-features",
+    "record_identifier_feature_name": "customer_id",
+    "event_time_feature_name": "event_timestamp",
+    "feature_group_status": "Created",
+    "creation_time": "2025-09-30T10:12:44Z",
+    "region": "ap-northeast-2"
+  }
+]
+```
+
+## GET api/glue-databases
+
+AWS Glue 데이터 카탈로그(Database) 정보를 조회합니다.
+Glue Catalog는 데이터 레이크/ETL 파이프라인에서 사용하는 메타데이터 저장소입니다.
+
+응답 예시:
+```json
+[
+  {
+    "name": "mlops_metadata",
+    "description": "MLOps pipeline metadata database",
+    "create_time": "2025-09-29T04:11:00Z",
+    "region": "ap-northeast-2"
+  }
+]
+
+```
+
+## GET api/glue-databases
+
+Amazon Kinesis Data Streams 정보를 조회합니다.
+실시간 데이터 스트리밍 파이프라인을 위한 리소스입니다.
+
+응답 예시:
+```json
+[
+  {
+    "stream_name": "mlops-ingestion-stream",
+    "stream_status": "ACTIVE",
+    "stream_mode": "PROVISIONED",
+    "shard_count": 2,
+    "region": "ap-northeast-2"
+  }
+]
+
+
+```
+
+## GET api/msk-clusters
+
+Amazon MSK (Managed Streaming for Apache Kafka) 클러스터 정보를 조회합니다.
+Kafka 기반 실시간 데이터 스트리밍 파이프라인을 관리할 수 있습니다.
+
+응답 예시:
+```json
+[
+  {
+    "stream_name": "mlops-ingestion-stream",
+    "stream_status": "ACTIVE",
+    "stream_mode": "PROVISIONED",
+    "shard_count": 2,
+    "region": "ap-northeast-2"
+  }
+]
+
+
+```
+
+
+
+
 ## GET api/backup-plans
 
 AWS 계정의 모든 주요 스토리지/데이터베이스 리소스를 한 번에 JSON으로 반환합니다.

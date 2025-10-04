@@ -83,5 +83,5 @@ def all_resources():
         "glue-databases": collector.get_glue_catalog_database(),
         "kinesis-streams": collector.get_kinesis_stream(),
         "msk-clusters": collector.get_msk_cluster(),
-        
+
     }
