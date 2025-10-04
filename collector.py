@@ -91,3 +91,65 @@ def get_backup_plans():
         from aws_backup_plan
         order by creation_date desc;
     """)
+
+import boto3
+import json
+
+
+def get_sagemaker_feature_group():
+    client = boto3.client("sagemaker", region_name="ap-northeast-2")
+    response = client.list_feature_groups()
+
+    groups = {
+        fg["FeatureGroupName"]: {
+            "creation_time": fg["CreationTime"].isoformat(),
+            "status": fg["FeatureGroupStatus"]
+        }
+        for fg in response.get("FeatureGroupSummaries", [])
+    }
+
+    return groups
+
+def get_glue_catalog_database():
+    return fetch("""
+        select
+          name,
+          description,
+          location_uri,
+          create_time,
+          catalog_id,
+          region
+        from
+          aws_glue_catalog_database
+        order by
+          name;
+""")
+
+def get_kinesis_stream():
+    return fetch("""
+        select
+          stream_name,
+          stream_arn,
+          stream_status,
+          open_shard_count,
+          region
+        from
+          aws_kinesis_stream
+        order by
+          stream_name;
+""")
+
+def get_msk_cluster():
+    return fetch("""
+        select
+          cluster_name,
+          arn,
+          state,
+          current_version as kafka_version,
+          region
+        from
+          aws_msk_cluster
+        order by
+          cluster_name;
+""")
+

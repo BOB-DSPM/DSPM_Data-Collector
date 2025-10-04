@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 import collector
 
+
 router = APIRouter()
 
 @router.get("/s3-buckets")
@@ -47,6 +48,22 @@ def glacier_vaults():
 def backup_plans():
     return collector.get_backup_plans()
 
+@router.get("/feature-groups")
+def sagemaker_feature_groups():
+    return collector.get_sagemaker_feature_group()
+
+@router.get("/glue-databases")
+def backup_plans():
+    return collector.get_glue_catalog_database()
+
+@router.get("/kinesis-streams")
+def backup_plans():
+    return collector.get_kinesis_stream()
+
+@router.get("/msk-clusters")
+def backup_plans():
+    return collector.get_msk_cluster()
+
 # 전체 리소스를 한 번에 반환하는 API
 @router.get("/all-resources")
 def all_resources():
@@ -62,4 +79,9 @@ def all_resources():
         "elasticache_clusters": collector.get_elasticache_clusters(),
         "glacier_vaults": collector.get_glacier_vaults(),
         "backup_plans": collector.get_backup_plans(),
+        "feature-groups": collector.get_sagemaker_feature_group(),
+        "glue-databases": collector.get_glue_catalog_database(),
+        "kinesis-streams": collector.get_kinesis_stream(),
+        "msk-clusters": collector.get_msk_cluster(),
+        
     }
