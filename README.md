@@ -37,7 +37,7 @@ python -m uvicorn main:app --reload
 ```
 
 ## API 사용법
-### GET /s3-buckets
+### GET api/s3-buckets
 현재 계정의 모든 S3정보를 JSON 형식으로 반환합니다.
 
 응답 예시
@@ -52,7 +52,7 @@ python -m uvicorn main:app --reload
 ]
 ```
 
-### GET /ebs-volumes
+### GET api/ebs-volumes
 현재 계정의 모든 S3 버킷 정보를 반환합니다.
 
 응답예시
@@ -77,7 +77,7 @@ python -m uvicorn main:app --reload
 ```
 
 
-### GET /efs-filesystems
+### GET api/efs-filesystems
 EFS (Elastic File System) 리소스를 조회합니다.
 
 응답예시
@@ -99,7 +99,7 @@ EFS (Elastic File System) 리소스를 조회합니다.
 
 ```
 
-### GET /fsx-filesystems
+### GET api/fsx-filesystems
 FSx (Windows, Lustre, NetApp 등) 파일 시스템을 조회합니다.
 
 응답예시
@@ -116,7 +116,7 @@ FSx (Windows, Lustre, NetApp 등) 파일 시스템을 조회합니다.
 
 ```
 
-### GET /dynamodb-tables
+### GET api/dynamodb-tables
 
 DynamoDB 테이블 정보를 조회합니다.
 
@@ -136,7 +136,7 @@ DynamoDB 테이블 정보를 조회합니다.
 ]
 ```
 
-### GET /rds-instances
+### GET api/rds-instances
 Amazon RDS 인스턴스의 정보를 조회합니다. RDS는 MySQL, PostgreSQL 등 다양한 데이터베이스 엔진을 지원하는 AWS의 관리형 데이터베이스 서비스입니다.
 
 응답예시
@@ -154,7 +154,7 @@ Amazon RDS 인스턴스의 정보를 조회합니다. RDS는 MySQL, PostgreSQL �
 
 ```
 
-### GET /redshift-clusters
+### GET api/redshift-clusters
 
 Redshift 클러스터 정보를 조회합니다.
 
@@ -173,7 +173,7 @@ Redshift 클러스터 정보를 조회합니다.
 ]
 ```
 
-## GET /rds-snapshots
+## GET api/rds-snapshots
 
 Amazon RDS 스냅샷 목록을 조회합니다. 스냅샷은 RDS 인스턴스의 시점 복원을 위한 백업 데이터입니다.
 
@@ -192,7 +192,7 @@ Amazon RDS 스냅샷 목록을 조회합니다. 스냅샷은 RDS 인스턴스의
 ]
 ```
 
-## GET /elasticache-clusters
+## GET api/elasticache-clusters
 
 ElastiCache 클러스터 정보를 조회합니다. Redis 또는 Memcached 엔진 기반의 인메모리 데이터 스토어입니다.
 
@@ -211,7 +211,7 @@ ElastiCache 클러스터 정보를 조회합니다. Redis 또는 Memcached 엔�
 ]
 ```
 
-## GET /glacier-vaults
+## GET api/glacier-vaults
 
 Amazon Glacier(Vault) 정보 조회. 장기 보관용 스토리지 솔루션입니다.
 
@@ -228,7 +228,7 @@ Amazon Glacier(Vault) 정보 조회. 장기 보관용 스토리지 솔루션입�
 ]
 ```
 
-## GET /backup-plans
+## GET api/backup-plans
 
 AWS Backup 서비스에서 정의된 백업 계획(Backup Plan)을 조회합니다.
 
@@ -244,6 +244,79 @@ AWS Backup 서비스에서 정의된 백업 계획(Backup Plan)을 조회합니�
 ]
 ```
 
+## GET api/backup-plans
+
+AWS 계정의 모든 주요 스토리지/데이터베이스 리소스를 한 번에 JSON으로 반환합니다.
+S3, EBS, EFS, FSx, RDS, DynamoDB, Redshift, ElastiCache, Glacier, Backup 등 포함됩니다.
+
+응답 예시:
+```json
+{
+  "s3_buckets": [
+    {
+      "name": "amazon-sagemaker-651706765732-ap-northeast-2-260d12a5d02d",
+      "region": "ap-northeast-2",
+      "creation_date": "2025-10-04T06:07:44+00:00"
+    },
+    {
+      "name": "my-mlops-dev-data",
+      "region": "ap-northeast-2",
+      "creation_date": "2025-10-03T03:39:41+00:00"
+    }
+  ],
+  "ebs_volumes": [
+    {
+      "volume_id": "vol-0d30006b46f00b2a6",
+      "size": 20,
+      "availability_zone": "ap-northeast-2a",
+      "encrypted": false,
+      "name": null
+    }
+  ],
+  "efs_filesystems": [
+    {
+      "file_system_id": "fs-0861e94265a837e07",
+      "creation_time": "2025-10-03T03:39:51+00:00",
+      "size_in_bytes": {
+        "Value": 6144,
+        "Timestamp": "2025-10-04T08:30:17Z",
+        "ValueInIA": 0,
+        "ValueInArchive": 0,
+        "ValueInStandard": 6144
+      },
+      "region": "ap-northeast-2"
+    }
+  ],
+  "fsx_filesystems": [],
+  "rds_instances": [
+    {
+      "db_instance_identifier": "dspmeksstack-dspmdatabasea69d27a7-ykujqpxuyvw0",
+      "engine": "postgres",
+      "allocated_storage": 20,
+      "status": "available",
+      "endpoint_address": "dspmeksstack-dspmdatabasea69d27a7-ykujqpxuyvw0.cdsikyuewe0q.ap-northeast-2.rds.amazonaws.com",
+      "class": "db.t3.micro"
+    }
+  ],
+  "rds_snapshots": [
+    {
+      "db_snapshot_identifier": "rds:dspmeksstack-dspmdatabasea69d27a7-ykujqpxuyvw0-2025-10-03-16-02",
+      "db_instance_identifier": "dspmeksstack-dspmdatabasea69d27a7-ykujqpxuyvw0",
+      "status": "available",
+      "engine": "postgres",
+      "create_time": "2025-10-03T16:02:23.570000+00:00",
+      "allocated_storage": 20,
+      "region": "ap-northeast-2"
+    }
+  ],
+  "dynamodb_tables": [],
+  "redshift_clusters": [],
+  "elasticache_clusters": [],
+  "glacier_vaults": [],
+  "backup_plans": []
+}
+
+```
 
 ## 주의사항
 반드시 steampipe service start 로 로컬 Steampipe 서버가 실행 중이어야 합니다.
