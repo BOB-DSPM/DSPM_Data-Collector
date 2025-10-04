@@ -324,7 +324,7 @@ Kafka 기반 실시간 데이터 스트리밍 파이프라인을 관리할 수 �
 
 
 
-## GET api/backup-plans
+## GET api/all-resources
 
 AWS 계정의 모든 주요 스토리지/데이터베이스 리소스를 한 번에 JSON으로 반환합니다.
 S3, EBS, EFS, FSx, RDS, DynamoDB, Redshift, ElastiCache, Glacier, Backup 등 포함됩니다.
@@ -421,6 +421,38 @@ S3, EBS, EFS, FSx, RDS, DynamoDB, Redshift, ElastiCache, Glacier, Backup 등 포
   "kinesis-streams": [],
   "msk-clusters": []
 }
+```
+
+```text
+지원하는 상세 조회 함수들:
+S3: get_s3_bucket_detail(bucket_name)
+EFS: get_efs_filesystem_detail(file_system_id)
+FSx: get_fsx_filesystem_detail(file_system_id)
+RDS: get_rds_instance_detail(db_identifier)
+DynamoDB: get_dynamodb_table_detail(table_name)
+Redshift: get_redshift_cluster_detail(cluster_id)
+RDS Snapshot: get_rds_snapshot_detail(snapshot_id)
+ElastiCache: get_elasticache_cluster_detail(cluster_id)
+Glacier: get_glacier_vault_detail(vault_name)
+AWS Backup: get_backup_plan_detail(plan_id)
+SageMaker Feature Group: get_sagemaker_feature_group_detail(feature_group_name)
+Glue Catalog Database: get_glue_database_detail(name)
+Kinesis Stream: get_kinesis_stream_detail(stream_name)
+MSK Cluster: get_msk_cluster_detail(cluster_name)
+GET /api/repositories/s3/{bucket_name}
+GET /api/repositories/efs/{file_system_id}
+GET /api/repositories/fsx/{file_system_id}
+GET /api/repositories/rds/{db_identifier}
+GET /api/repositories/dynamodb/{table_name}
+GET /api/repositories/redshift/{cluster_id}
+GET /api/repositories/rds-snapshot/{snapshot_id}
+GET /api/repositories/elasticache/{cluster_id}
+GET /api/repositories/glacier/{vault_name}
+GET /api/repositories/backup/{plan_id}
+GET /api/repositories/feature-group/{feature_group_name}
+GET /api/repositories/glue/{name}
+GET /api/repositories/kinesis/{stream_name}
+GET /api/repositories/msk/{cluster_name}
 ```
 
 ## 주의사항
