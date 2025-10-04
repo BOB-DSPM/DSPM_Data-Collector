@@ -1,87 +1,121 @@
+# resources.py
 from fastapi import APIRouter
-import collector
-
+import asyncio
+import apps.collector as collector
 
 router = APIRouter()
 
 @router.get("/s3-buckets")
-def s3_buckets():
-    return collector.get_s3_buckets()
+async def s3_buckets():
+    return await asyncio.to_thread(collector.get_s3_buckets)
 
 @router.get("/ebs-volumes")
-def ebs_volumes():
-    return collector.get_ebs_volumes()
+async def ebs_volumes():
+    return await asyncio.to_thread(collector.get_ebs_volumes)
 
 @router.get("/efs-filesystems")
-def efs_filesystems():
-    return collector.get_efs_filesystems()
+async def efs_filesystems():
+    return await asyncio.to_thread(collector.get_efs_filesystems)
 
 @router.get("/fsx-filesystems")
-def fsx_filesystems():
-    return collector.get_fsx_filesystems()
+async def fsx_filesystems():
+    return await asyncio.to_thread(collector.get_fsx_filesystems)
 
 @router.get("/rds-instances")
-def rds_instances():
-    return collector.get_rds_instances()
+async def rds_instances():
+    return await asyncio.to_thread(collector.get_rds_instances)
 
 @router.get("/dynamodb-tables")
-def dynamodb_tables():
-    return collector.get_dynamodb_tables()
+async def dynamodb_tables():
+    return await asyncio.to_thread(collector.get_dynamodb_tables)
 
 @router.get("/redshift-clusters")
-def redshift_clusters():
-    return collector.get_redshift_clusters()
+async def redshift_clusters():
+    return await asyncio.to_thread(collector.get_redshift_clusters)
 
 @router.get("/rds-snapshots")
-def rds_snapshots():
-    return collector.get_rds_snapshots()
+async def rds_snapshots():
+    return await asyncio.to_thread(collector.get_rds_snapshots)
 
 @router.get("/elasticache-clusters")
-def elasticache_clusters():
-    return collector.get_elasticache_clusters()
+async def elasticache_clusters():
+    return await asyncio.to_thread(collector.get_elasticache_clusters)
 
 @router.get("/glacier-vaults")
-def glacier_vaults():
-    return collector.get_glacier_vaults()
+async def glacier_vaults():
+    return await asyncio.to_thread(collector.get_glacier_vaults)
 
 @router.get("/backup-plans")
-def backup_plans():
-    return collector.get_backup_plans()
+async def backup_plans():
+    return await asyncio.to_thread(collector.get_backup_plans)
 
 @router.get("/feature-groups")
-def sagemaker_feature_groups():
-    return collector.get_sagemaker_feature_group()
+async def sagemaker_feature_groups():
+    return await asyncio.to_thread(collector.get_sagemaker_feature_group)
 
 @router.get("/glue-databases")
-def backup_plans():
-    return collector.get_glue_catalog_database()
+async def glue_databases():
+    return await asyncio.to_thread(collector.get_glue_catalog_database)
 
 @router.get("/kinesis-streams")
-def backup_plans():
-    return collector.get_kinesis_stream()
+async def kinesis_streams():
+    return await asyncio.to_thread(collector.get_kinesis_stream)
 
 @router.get("/msk-clusters")
-def backup_plans():
-    return collector.get_msk_cluster()
+async def msk_clusters():
+    return await asyncio.to_thread(collector.get_msk_cluster)
 
 # 전체 리소스를 한 번에 반환하는 API
 @router.get("/all-resources")
-def all_resources():
-    return {
-        "s3_buckets": collector.get_s3_buckets(),
-        "ebs_volumes": collector.get_ebs_volumes(),
-        "efs_filesystems": collector.get_efs_filesystems(),
-        "fsx_filesystems": collector.get_fsx_filesystems(),
-        "rds_instances": collector.get_rds_instances(),
-        "rds_snapshots": collector.get_rds_snapshots(),
-        "dynamodb_tables": collector.get_dynamodb_tables(),
-        "redshift_clusters": collector.get_redshift_clusters(),
-        "elasticache_clusters": collector.get_elasticache_clusters(),
-        "glacier_vaults": collector.get_glacier_vaults(),
-        "backup_plans": collector.get_backup_plans(),
-        "feature-groups": collector.get_sagemaker_feature_group(),
-        "glue-databases": collector.get_glue_catalog_database(),
-        "kinesis-streams": collector.get_kinesis_stream(),
-        "msk-clusters": collector.get_msk_cluster(),
+async def all_resources():
+    (
+        s3_buckets,
+        ebs_volumes,
+        efs_filesystems,
+        fsx_filesystems,
+        rds_instances,
+        rds_snapshots,
+        dynamodb_tables,
+        redshift_clusters,
+        elasticache_clusters,
+        glacier_vaults,
+        backup_plans,
+        feature_groups,
+        glue_databases,
+        kinesis_streams,
+        msk_clusters,
+    ) = await asyncio.gather(
+        asyncio.to_thread(collector.get_s3_buckets),
+        asyncio.to_thread(collector.get_ebs_volumes),
+        asyncio.to_thread(collector.get_efs_filesystems),
+        asyncio.to_thread(collector.get_fsx_filesystems),
+        asyncio.to_thread(collector.get_rds_instances),
+        asyncio.to_thread(collector.get_rds_snapshots),
+        asyncio.to_thread(collector.get_dynamodb_tables),
+        asyncio.to_thread(collector.get_redshift_clusters),
+        asyncio.to_thread(collector.get_elasticache_clusters),
+        asyncio.to_thread(collector.get_glacier_vaults),
+        asyncio.to_thread(collector.get_backup_plans),
+        asyncio.to_thread(collector.get_sagemaker_feature_group),
+        asyncio.to_thread(collector.get_glue_catalog_database),
+        asyncio.to_thread(collector.get_kinesis_stream),
+        asyncio.to_thread(collector.get_msk_cluster),
+    )
 
+    return {
+        "s3_buckets": s3_buckets,
+        "ebs_volumes": ebs_volumes,
+        "efs_filesystems": efs_filesystems,
+        "fsx_filesystems": fsx_filesystems,
+        "rds_instances": rds_instances,
+        "rds_snapshots": rds_snapshots,
+        "dynamodb_tables": dynamodb_tables,
+        "redshift_clusters": redshift_clusters,
+        "elasticache_clusters": elasticache_clusters,
+        "glacier_vaults": glacier_vaults,
+        "backup_plans": backup_plans,
+        "feature_groups": feature_groups,
+        "glue_databases": glue_databases,
+        "kinesis_streams": kinesis_streams,
+        "msk_clusters": msk_clusters,
     }

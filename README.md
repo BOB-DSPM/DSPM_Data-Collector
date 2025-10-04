@@ -339,9 +339,9 @@ S3, EBS, EFS, FSx, RDS, DynamoDB, Redshift, ElastiCache, Glacier, Backup 등 포
       "creation_date": "2025-10-04T06:07:44+00:00"
     },
     {
-      "name": "my-mlops-dev-data",
+      "name": "mlopsdemo-churnxgboostpipelinestack-asset-ap-northeast-2-65170",
       "region": "ap-northeast-2",
-      "creation_date": "2025-10-03T03:39:41+00:00"
+      "creation_date": "2025-10-04T09:32:36+00:00"
     }
   ],
   "ebs_volumes": [
@@ -359,7 +359,7 @@ S3, EBS, EFS, FSx, RDS, DynamoDB, Redshift, ElastiCache, Glacier, Backup 등 포
       "creation_time": "2025-10-03T03:39:51+00:00",
       "size_in_bytes": {
         "Value": 6144,
-        "Timestamp": "2025-10-04T08:30:17Z",
+        "Timestamp": "2025-10-04T09:45:40Z",
         "ValueInIA": 0,
         "ValueInArchive": 0,
         "ValueInStandard": 6144
@@ -393,9 +393,34 @@ S3, EBS, EFS, FSx, RDS, DynamoDB, Redshift, ElastiCache, Glacier, Backup 등 포
   "redshift_clusters": [],
   "elasticache_clusters": [],
   "glacier_vaults": [],
-  "backup_plans": []
+  "backup_plans": [],
+  "feature-groups": {
+    "ad-click-feature-group-dev": {
+      "creation_time": "2025-09-30T10:44:13.318000+09:00",
+      "status": "Created"
+    },
+    "ad-click-feature-group": {
+      "creation_time": "2025-09-19T17:46:13.427000+09:00",
+      "status": "Created"
+    },
+    "ad-click-dev-feature-group": {
+      "creation_time": "2025-10-01T10:56:23.868000+09:00",
+      "status": "Created"
+    }
+  },
+  "glue-databases": [
+    {
+      "name": "sagemaker_featurestore",
+      "description": null,
+      "location_uri": null,
+      "create_time": "2025-10-03T03:41:02+00:00",
+      "catalog_id": "651706765732",
+      "region": "ap-northeast-2"
+    }
+  ],
+  "kinesis-streams": [],
+  "msk-clusters": []
 }
-
 ```
 
 ## 주의사항

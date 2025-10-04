@@ -1,12 +1,17 @@
+# collector.py
 from sqlalchemy import create_engine
 import pandas as pd
+import boto3
 
 # Steampipe PostgreSQL 연결
 engine = create_engine("postgresql://steampipe@localhost:9193/steampipe")
 
 def fetch(query: str):
+    """Steampipe PostgreSQL에서 쿼리 실행 후 결과 반환"""
     df = pd.read_sql(query, engine)
     return df.to_dict(orient="records")
+
+# ---------- AWS 리소스 조회 함수들 ----------
 
 def get_s3_buckets():
     return fetch("""
@@ -92,9 +97,7 @@ def get_backup_plans():
         order by creation_date desc;
     """)
 
-import boto3
-import json
-
+# ---------- boto3 API 호출 (예: SageMaker) ----------
 
 def get_sagemaker_feature_group():
     client = boto3.client("sagemaker", region_name="ap-northeast-2")
@@ -107,8 +110,9 @@ def get_sagemaker_feature_group():
         }
         for fg in response.get("FeatureGroupSummaries", [])
     }
-
     return groups
+
+# ---------- Steampipe로 Glue, Kinesis, MSK 조회 ----------
 
 def get_glue_catalog_database():
     return fetch("""
@@ -123,7 +127,7 @@ def get_glue_catalog_database():
           aws_glue_catalog_database
         order by
           name;
-""")
+    """)
 
 def get_kinesis_stream():
     return fetch("""
@@ -137,7 +141,7 @@ def get_kinesis_stream():
           aws_kinesis_stream
         order by
           stream_name;
-""")
+    """)
 
 def get_msk_cluster():
     return fetch("""
@@ -151,5 +155,4 @@ def get_msk_cluster():
           aws_msk_cluster
         order by
           cluster_name;
-""")
-
+    """)
