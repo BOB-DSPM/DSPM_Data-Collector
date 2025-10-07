@@ -72,3 +72,22 @@ async def rds_explorer(
         explorer.get_rds_data,
         endpoint, port, db_name, user, password, table_name, limit
     )
+
+@router.get("/explorer/msk/{cluster_arn}")
+async def msk_explorer(cluster_arn: str, topic: str, limit: int = Query(20, le=100)):
+    return await asyncio.to_thread(explorer.get_msk_records, cluster_arn, topic, limit)
+
+@router.get("/explorer/elasticache/redis")
+async def elasticache_redis_explorer(
+    host: str,
+    port: int = Query(6379, description="Redis 포트"),
+    password: str | None = Query(None, description="Redis AUTH 비밀번호 (없으면 None)"),
+    db: int = Query(0, description="Redis DB index"),
+    pattern: str = Query("*", description="SCAN 매칭 패턴"),
+    limit: int = Query(50, le=500, description="최대 키 개수"),
+    per_collection_limit: int = Query(50, le=500, description="LIST/SET/ZSET/HASH 등 컬렉션 당 샘플 개수"),
+):
+    return await asyncio.to_thread(
+        explorer.get_redis_data,
+        host, port, password, db, pattern, limit, per_collection_limit
+    )

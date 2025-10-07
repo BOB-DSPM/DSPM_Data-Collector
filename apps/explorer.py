@@ -3,6 +3,9 @@ import boto3
 import gzip
 import json
 import psycopg2
+from kafka import KafkaConsumer
+import redis
+from typing import Any, Dict, List, Optional
 
 def get_s3_all_objects_content(bucket_name: str, prefix: str = "", max_keys: int = 100):
     """
@@ -262,3 +265,220 @@ def get_rds_data(endpoint: str, port: int, db_name: str, user: str, password: st
     finally:
         if conn:
             conn.close()
+
+
+def get_msk_records(cluster_arn: str, topic: str, limit: int = 20):
+    client = boto3.client("kafka", region_name="ap-northeast-2")
+    brokers_info = client.get_bootstrap_brokers(ClusterArn=cluster_arn)
+    bootstrap_servers = brokers_info.get("BootstrapBrokerString")
+
+    if not bootstrap_servers:
+        return {"error": "Bootstrap servers not found for cluster."}
+
+    consumer = KafkaConsumer(
+        topic,
+        bootstrap_servers=bootstrap_servers,
+        auto_offset_reset="latest",  
+        enable_auto_commit=False,
+        consumer_timeout_ms=5000,   
+        security_protocol="PLAINTEXT"
+    )
+
+    records = []
+    try:
+        for i, msg in enumerate(consumer):
+            if i >= limit:
+                break
+            try:
+                payload = msg.value.decode("utf-8")
+                try:
+                    payload = json.loads(payload)
+                except Exception:
+                    pass
+            except Exception:
+                payload = str(msg.value)
+
+            records.append({
+                "topic": msg.topic,
+                "partition": msg.partition,
+                "offset": msg.offset,
+                "key": msg.key.decode("utf-8") if msg.key else None,
+                "value": payload
+            })
+    finally:
+        consumer.close()
+
+    return {"cluster_arn": cluster_arn, "topic": topic, "records": records}
+
+def _try_parse_bytes(data: Optional[bytes]) -> Any:
+    if data is None:
+        return None
+    # 바이트 → 텍스트/JSON 추론
+    try:
+        txt = data.decode("utf-8")
+        try:
+            return json.loads(txt)
+        except Exception:
+            return txt
+    except Exception:
+        # 사람이 볼 수 있도록 앞부분만
+        return {"raw_bytes_preview": str(data[:200]) + ("..." if len(data) > 200 else "")}
+
+def get_redis_data(
+    host: str,
+    port: int = 6379,
+    password: Optional[str] = None,
+    db: int = 0,
+    pattern: str = "*",
+    limit: int = 50,
+    per_collection_limit: int = 50,
+) -> Dict[str, Any]:
+    r = None
+    try:
+        r = redis.Redis(
+            host=host,
+            port=port,
+            password=password,
+            db=db,
+            socket_timeout=5,          
+            socket_connect_timeout=5,
+            decode_responses=False,   
+        )
+
+        pong = r.ping()
+
+        results: List[Dict[str, Any]] = []
+        scanned = 0
+        cursor = 0
+
+        while True:
+            cursor, keys = r.scan(cursor=cursor, match=pattern, count=200)
+            for key in keys:
+                if scanned >= limit:
+                    return {
+                        "host": host,
+                        "port": port,
+                        "db": db,
+                        "pattern": pattern,
+                        "keys_returned": len(results),
+                        "keys_limit": limit,
+                        "items": results,
+                    }
+
+                k = key 
+                k_str = k.decode("utf-8", errors="ignore")
+
+                try:
+                    ktype = r.type(k) 
+                    ktype_str = ktype.decode("utf-8")
+
+                    ttl = r.ttl(k) 
+                    try:
+                        mem = r.memory_usage(k)
+                    except Exception:
+                        mem = None
+
+                    item: Dict[str, Any] = {
+                        "key": k_str,
+                        "type": ktype_str,
+                        "ttl": ttl,
+                        "memory_usage": mem,
+                    }
+
+                    if ktype_str == "string":
+                        val = r.get(k)
+                        item["value"] = _try_parse_bytes(val)
+
+                    elif ktype_str == "list":
+                        vals = r.lrange(k, 0, max(per_collection_limit - 1, 0))
+                        item["values"] = [_try_parse_bytes(v) for v in vals]
+                        item["length"] = r.llen(k)
+
+                    elif ktype_str == "set":
+                        scursor = 0
+                        svals: List[Any] = []
+                        while True:
+                            scursor, members = r.sscan(k, scursor, count=per_collection_limit)
+                            svals.extend(members)
+                            if scursor == 0 or len(svals) >= per_collection_limit:
+                                break
+                        item["values"] = [_try_parse_bytes(v) for v in svals[:per_collection_limit]]
+                        try:
+                            item["length"] = r.scard(k)
+                        except Exception:
+                            pass
+
+                    elif ktype_str == "zset":
+                        vals = r.zrange(k, 0, max(per_collection_limit - 1, 0), withscores=True)
+                        item["values"] = [
+                            {"member": _try_parse_bytes(m), "score": s} for (m, s) in vals
+                        ]
+                        try:
+                            item["length"] = r.zcard(k)
+                        except Exception:
+                            pass
+
+                    elif ktype_str == "hash":
+                        hcursor = 0
+                        hitems: List[Dict[str, Any]] = []
+                        while True:
+                            hcursor, pairs = r.hscan(k, hcursor, count=per_collection_limit)
+                            for field, val in pairs.items():
+                                hitems.append({
+                                    "field": field.decode("utf-8", errors="ignore"),
+                                    "value": _try_parse_bytes(val),
+                                })
+                            if hcursor == 0 or len(hitems) >= per_collection_limit:
+                                break
+                        item["items"] = hitems[:per_collection_limit]
+                        try:
+                            item["length"] = r.hlen(k)
+                        except Exception:
+                            pass
+
+                    elif ktype_str == "stream":
+                        entries = r.xrevrange(k, count=per_collection_limit)
+                        parsed = []
+                        for entry_id, fields in entries:
+                            parsed.append({
+                                "id": entry_id.decode("utf-8", errors="ignore"),
+                                "fields": {
+                                    (fk.decode("utf-8", errors="ignore")): _try_parse_bytes(fv)
+                                    for fk, fv in fields.items()
+                                }
+                            })
+                        item["entries"] = parsed
+
+                    else:
+                        item["note"] = "Unsupported or module type (value sampling skipped)."
+
+                except Exception as e_key:
+                    item = {
+                        "key": k_str,
+                        "error": str(e_key),
+                    }
+
+                results.append(item)
+                scanned += 1
+
+            if cursor == 0:
+                break
+
+        return {
+            "host": host,
+            "port": port,
+            "db": db,
+            "pattern": pattern,
+            "keys_returned": len(results),
+            "keys_limit": limit,
+            "items": results,
+        }
+
+    except Exception as e:
+        return {"error": str(e), "host": host, "port": port, "db": db, "pattern": pattern}
+    finally:
+        if r:
+            try:
+                r.close()
+            except Exception:
+                pass

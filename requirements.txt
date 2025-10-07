@@ -4,3 +4,4 @@ sqlalchemy
 pandas
 psycopg2-binary
 boto3
+redis>=5.0.0
