@@ -46,3 +46,29 @@ async def kinesis_explorer(
     return await asyncio.to_thread(
         explorer.get_kinesis_records, stream_name, shard_id, limit
     )
+
+@router.get("/explorer/feature-group/{feature_group_name}")
+async def feature_group_data(
+    feature_group_name: str,
+    max_keys: int = Query(20, le=100)
+):
+    return await asyncio.to_thread(
+        explorer.get_feature_group_data, feature_group_name, max_keys
+    )
+
+
+@router.get("/explorer/rds/{db_identifier}")
+async def rds_explorer(
+    db_identifier: str,
+    endpoint: str,
+    port: int = 5432,
+    db_name: str = "postgres",
+    user: str = "postgres",
+    password: str = Query(..., description="Database password"),
+    table_name: str = None,
+    limit: int = Query(50, le=200)
+):
+    return await asyncio.to_thread(
+        explorer.get_rds_data,
+        endpoint, port, db_name, user, password, table_name, limit
+    )

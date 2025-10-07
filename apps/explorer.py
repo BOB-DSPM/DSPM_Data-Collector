@@ -199,3 +199,66 @@ def get_kinesis_records(stream_name: str, shard_id: str = None, limit: int = 20)
         "shard_id": shard_id,
         "records": records
     }
+
+def get_feature_group_data(feature_group_name: str, max_keys: int = 20):
+    sm = boto3.client("sagemaker", region_name="ap-northeast-2")
+    response = sm.describe_feature_group(FeatureGroupName=feature_group_name)
+
+    offline_store = response.get("OfflineStoreConfig", {}).get("S3StorageConfig", {})
+    s3_uri = offline_store.get("ResolvedOutputS3Uri")
+
+    if not s3_uri:
+        return {"feature_group": feature_group_name, "error": "Offline Store (S3) 없음"}
+
+    s3_path = s3_uri.replace("s3://", "")
+    parts = s3_path.split("/", 1)
+    bucket = parts[0]
+    prefix = parts[1] if len(parts) > 1 else ""
+
+    objects = get_s3_all_objects_content(bucket, prefix, max_keys)
+
+    return {
+        "feature_group": feature_group_name,
+        "offline_store": s3_uri,
+        "objects": objects
+    }
+
+def get_rds_data(endpoint: str, port: int, db_name: str, user: str, password: str, table_name: str = None, limit: int = 50):
+    conn = None
+    results = []
+
+    try:
+        conn = psycopg2.connect(
+            host=endpoint,
+            port=port,
+            dbname=db_name,
+            user=user,
+            password=password,
+            connect_timeout=10
+        )
+        cursor = conn.cursor()
+
+        if not table_name:
+            cursor.execute("""
+                SELECT tablename
+                FROM pg_tables
+                WHERE schemaname = 'public'
+                ORDER BY tablename;
+            """)
+            rows = cursor.fetchall()
+            results = [{"table": r[0]} for r in rows]
+        else:
+            cursor.execute(f'SELECT * FROM public."{table_name}" LIMIT {limit};')
+            colnames = [desc[0] for desc in cursor.description]
+            rows = cursor.fetchall()
+            results = [dict(zip(colnames, row)) for row in rows]
+
+        cursor.close()
+        return results
+
+    except Exception as e:
+        return {"error": str(e)}
+
+    finally:
+        if conn:
+            conn.close()
