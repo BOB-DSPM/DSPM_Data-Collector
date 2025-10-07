@@ -36,3 +36,13 @@ async def redshift_explorer(
         explorer.get_redshift_data,
         endpoint, port, db_name, user, password, table_name, limit
     )
+
+@router.get("/explorer/kinesis/{stream_name}")
+async def kinesis_explorer(
+    stream_name: str,
+    shard_id: str = None,
+    limit: int = Query(20, le=100)
+):
+    return await asyncio.to_thread(
+        explorer.get_kinesis_records, stream_name, shard_id, limit
+    )

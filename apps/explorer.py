@@ -159,3 +159,43 @@ def get_redshift_data(endpoint: str, port: int, db_name: str, user: str, passwor
     finally:
         if conn:
             conn.close()
+
+
+def get_kinesis_records(stream_name: str, shard_id: str = None, limit: int = 20):
+    client = boto3.client("kinesis", region_name="ap-northeast-2")
+
+    if not shard_id:
+        shards = client.describe_stream_summary(StreamName=stream_name)
+        shard_response = client.describe_stream(StreamName=stream_name, Limit=1)
+        shard_id = shard_response["StreamDescription"]["Shards"][0]["ShardId"]
+
+    shard_iterator = client.get_shard_iterator(
+        StreamName=stream_name,
+        ShardId=shard_id,
+        ShardIteratorType="LATEST"
+    )["ShardIterator"]
+
+    response = client.get_records(ShardIterator=shard_iterator, Limit=limit)
+
+    records = []
+    for record in response.get("Records", []):
+        try:
+            payload = base64.b64decode(record["Data"]).decode("utf-8")
+            try:
+                payload = json.loads(payload)
+            except Exception:
+                pass
+        except Exception:
+            payload = str(record["Data"])
+
+        records.append({
+            "sequence_number": record["SequenceNumber"],
+            "partition_key": record["PartitionKey"],
+            "data": payload
+        })
+
+    return {
+        "stream_name": stream_name,
+        "shard_id": shard_id,
+        "records": records
+    }
