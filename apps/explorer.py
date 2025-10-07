@@ -118,3 +118,44 @@ def get_glue_data(database_name: str, table_name: str = None, max_keys: int = 20
                         "error": str(e)
                     })
         return results
+
+def get_redshift_data(endpoint: str, port: int, db_name: str, user: str, password: str, table_name: str = None, limit: int = 50):
+    conn = None
+    results = []
+
+    try:
+        conn = psycopg2.connect(
+            host=endpoint,
+            port=port,
+            dbname=db_name,
+            user=user,
+            password=password,
+            connect_timeout=10
+        )
+        cursor = conn.cursor()
+
+        if not table_name:
+            cursor.execute("""
+                SELECT tablename
+                FROM pg_table_def
+                WHERE schemaname = 'public'
+                GROUP BY tablename
+                ORDER BY tablename;
+            """)
+            rows = cursor.fetchall()
+            results = [{"table": r[0]} for r in rows]
+        else:
+            cursor.execute(f'SELECT * FROM public."{table_name}" LIMIT {limit};')
+            colnames = [desc[0] for desc in cursor.description]
+            rows = cursor.fetchall()
+            results = [dict(zip(colnames, row)) for row in rows]
+
+        cursor.close()
+        return results
+
+    except Exception as e:
+        return {"error": str(e)}
+
+    finally:
+        if conn:
+            conn.close()
