@@ -2,6 +2,7 @@
 import boto3
 import gzip
 import json
+import psycopg2
 
 def get_s3_all_objects_content(bucket_name: str, prefix: str = "", max_keys: int = 100):
     """
@@ -49,3 +50,21 @@ def get_s3_all_objects_content(bucket_name: str, prefix: str = "", max_keys: int
             count += 1
 
     return results
+
+
+def get_dynamodb_items(table_name: str, limit: int = 50, last_key: dict = None):
+    """
+    DynamoDB 테이블 아이템 조회 (limit 단위)
+    """
+    client = boto3.client("dynamodb", region_name="ap-northeast-2")
+    params = {"TableName": table_name, "Limit": limit}
+    if last_key:
+        params["ExclusiveStartKey"] = last_key
+
+    response = client.scan(**params)
+
+    return {
+        "count": response.get("Count", 0),
+        "items": response.get("Items", []),
+        "last_evaluated_key": response.get("LastEvaluatedKey")  # 다음 페이지 키
+    }
