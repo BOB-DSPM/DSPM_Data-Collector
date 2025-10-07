@@ -92,11 +92,24 @@ def get_sagemaker_feature_group_detail(feature_group_name: str):
 # ---------- Steampipe 기반 기타 ----------
 
 def get_glue_database_detail(name: str):
-    return fetch(f"""
+    db_info = fetch(f"""
         select *
         from aws_glue_catalog_database
         where name = '{name}';
     """)
+
+    tables = fetch(f"""
+        select
+          name as table_name,
+          storage_descriptor ->> 'Location' as location
+        from aws_glue_catalog_table
+        where database_name = '{name}';
+    """)
+
+    return {
+        "database": db_info,
+        "tables": tables
+    }
 
 def get_kinesis_stream_detail(stream_name: str):
     return fetch(f"""

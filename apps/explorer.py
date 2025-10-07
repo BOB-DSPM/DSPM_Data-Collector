@@ -68,3 +68,53 @@ def get_dynamodb_items(table_name: str, limit: int = 50, last_key: dict = None):
         "items": response.get("Items", []),
         "last_evaluated_key": response.get("LastEvaluatedKey")  # 다음 페이지 키
     }
+
+def get_glue_data(database_name: str, table_name: str = None, max_keys: int = 20):
+    """
+    Glue Database에서 데이터 조회
+    - table_name이 지정되면 해당 테이블 데이터만 조회
+    - table_name이 없으면 모든 테이블 데이터를 조회
+    """
+    glue = boto3.client("glue", region_name="ap-northeast-2")
+    results = []
+
+    def fetch_table_data(tbl_name: str):
+        table = glue.get_table(DatabaseName=database_name, Name=tbl_name)
+        location = table["Table"]["StorageDescriptor"].get("Location")
+
+        if not location or not location.startswith("s3://"):
+            return {
+                "table": tbl_name,
+                "error": "지원하지 않는 저장소거나 S3 location 없음",
+                "location": location
+            }
+
+        s3_path = location.replace("s3://", "")
+        parts = s3_path.split("/", 1)
+        bucket = parts[0]
+        prefix = parts[1] if len(parts) > 1 else ""
+
+        objects = get_s3_all_objects_content(bucket, prefix, max_keys)
+        return {
+            "table": tbl_name,
+            "location": location,
+            "objects": objects
+        }
+
+    if table_name:
+        # 특정 테이블만 조회
+        return fetch_table_data(table_name)
+    else:
+        # 모든 테이블 조회
+        paginator = glue.get_paginator("get_tables")
+        for page in paginator.paginate(DatabaseName=database_name):
+            for tbl in page.get("TableList", []):
+                tbl_name = tbl["Name"]
+                try:
+                    results.append(fetch_table_data(tbl_name))
+                except Exception as e:
+                    results.append({
+                        "table": tbl_name,
+                        "error": str(e)
+                    })
+        return results

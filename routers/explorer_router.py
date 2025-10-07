@@ -13,3 +13,11 @@ async def s3_all_objects(bucket_name: str, prefix: str = "", max_keys: int = Que
 @router.get("/explorer/dynamodb/{table_name}")
 async def dynamodb_items(table_name: str, limit: int = Query(50, le=200)):
     return await asyncio.to_thread(explorer.get_dynamodb_items, table_name, limit)
+
+@router.get("/explorer/glue/{database_name}")
+async def glue_explorer(
+    database_name: str,
+    table_name: str = None,
+    max_keys: int = Query(20, le=100)
+):
+    return await asyncio.to_thread(explorer.get_glue_data, database_name, table_name, max_keys)
