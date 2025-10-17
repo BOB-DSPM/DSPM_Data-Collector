@@ -1,65 +1,109 @@
 # apps/explorer.py
+from __future__ import annotations
+
+import base64
 import boto3
 import gzip
 import json
+import os
 import psycopg2
-from kafka import KafkaConsumer
 import redis
 from typing import Any, Dict, List, Optional
 
+from botocore.exceptions import ClientError, NoCredentialsError, EndpointConnectionError
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# S3: 버킷/프리픽스에서 객체 본문을 일부 수집 (최대 max_keys)
+# - 버킷 미존재/권한/네트워크 등의 예외는 JSON 에러로 반환
+# - 각 객체별 파싱 실패는 해당 객체 요소에 error 필드로 기록
+# ──────────────────────────────────────────────────────────────────────────────
 def get_s3_all_objects_content(bucket_name: str, prefix: str = "", max_keys: int = 100):
-    """
-    S3 버킷 안의 모든 객체 내용을 가져옴 (limit 적용)
-    """
-    client = boto3.client("s3", region_name="ap-northeast-2")
+    client = boto3.client("s3", region_name=os.getenv("AWS_REGION", "ap-northeast-2"))
     paginator = client.get_paginator("list_objects_v2")
-    
-    results = []
+
+    results: List[Dict[str, Any]] = []
     count = 0
 
-    for page in paginator.paginate(Bucket=bucket_name, Prefix=prefix):
-        for obj in page.get("Contents", []):
-            if count >= max_keys:  # 안전장치
-                return results
+    try:
+        # 버킷/프리픽스 목록 페이지네이션
+        for page in paginator.paginate(Bucket=bucket_name, Prefix=prefix):
+            contents = page.get("Contents", [])
+            if not contents:
+                # 객체가 하나도 없을 수 있음 (정상 케이스)
+                continue
 
-            key = obj["Key"]
-            try:
-                s3_obj = client.get_object(Bucket=bucket_name, Key=key)
-                body = s3_obj["Body"].read()
+            for obj in contents:
+                if count >= max_keys:  # 안전장치
+                    return results
 
-                if key.endswith(".gz"):
-                    try:
-                        body = gzip.decompress(body)
-                    except Exception:
-                        pass
-
+                key = obj["Key"]
                 try:
-                    parsed = json.loads(body)
-                except Exception:
+                    s3_obj = client.get_object(Bucket=bucket_name, Key=key)
+                    body = s3_obj["Body"].read()
+
+                    if key.endswith(".gz"):
+                        try:
+                            body = gzip.decompress(body)
+                        except Exception:
+                            # gzip이 아니거나 깨진 파일일 수 있으니 그대로 진행
+                            pass
+
+                    # JSON 시도 → 실패 시 텍스트 → 그래도 실패 시 바이트 프리뷰
                     try:
-                        parsed = {"text": body.decode("utf-8", errors="ignore")}
+                        parsed = json.loads(body)
                     except Exception:
-                        parsed = {"raw_bytes": str(body[:200]) + "..."}
-                
-                results.append({
-                    "key": key,
-                    "size": obj["Size"],
-                    "last_modified": obj["LastModified"].isoformat(),
-                    "content": parsed
-                })
-            except Exception as e:
-                results.append({"key": key, "error": str(e)})
-            
-            count += 1
+                        try:
+                            parsed = {"text": body.decode("utf-8", errors="ignore")}
+                        except Exception:
+                            parsed = {"raw_bytes": (body[:200]).hex() + ("..." if len(body) > 200 else "")}
 
-    return results
+                    results.append({
+                        "key": key,
+                        "size": obj.get("Size"),
+                        "last_modified": obj.get("LastModified").isoformat() if obj.get("LastModified") else None,
+                        "content": parsed
+                    })
+
+                except ClientError as ce:
+                    results.append({"key": key, "error": str(ce)})
+                except Exception as e:
+                    results.append({"key": key, "error": str(e)})
+
+                count += 1
+
+        return results
+
+    except ClientError as e:
+        code = e.response.get("Error", {}).get("Code", "")
+        # 대표적인 에러들: NoSuchBucket, AccessDenied 등
+        return {
+            "error": str(e),
+            "bucket": bucket_name,
+            "prefix": prefix,
+            "code": code or "ClientError",
+        }
+    except (NoCredentialsError, EndpointConnectionError) as e:
+        return {
+            "error": str(e),
+            "bucket": bucket_name,
+            "prefix": prefix,
+            "code": e.__class__.__name__,
+        }
+    except Exception as e:
+        return {
+            "error": str(e),
+            "bucket": bucket_name,
+            "prefix": prefix,
+            "code": "UnknownError",
+        }
 
 
+# ──────────────────────────────────────────────────────────────────────────────
+# DynamoDB: 간단 스캔(페이지 단위)
+# ──────────────────────────────────────────────────────────────────────────────
 def get_dynamodb_items(table_name: str, limit: int = 50, last_key: dict = None):
-    """
-    DynamoDB 테이블 아이템 조회 (limit 단위)
-    """
-    client = boto3.client("dynamodb", region_name="ap-northeast-2")
+    client = boto3.client("dynamodb", region_name=os.getenv("AWS_REGION", "ap-northeast-2"))
     params = {"TableName": table_name, "Limit": limit}
     if last_key:
         params["ExclusiveStartKey"] = last_key
@@ -72,18 +116,18 @@ def get_dynamodb_items(table_name: str, limit: int = 50, last_key: dict = None):
         "last_evaluated_key": response.get("LastEvaluatedKey")  # 다음 페이지 키
     }
 
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Glue: 테이블 S3 Location 따라 S3 내용 샘플링
+# ──────────────────────────────────────────────────────────────────────────────
 def get_glue_data(database_name: str, table_name: str = None, max_keys: int = 20):
-    """
-    Glue Database에서 데이터 조회
-    - table_name이 지정되면 해당 테이블 데이터만 조회
-    - table_name이 없으면 모든 테이블 데이터를 조회
-    """
-    glue = boto3.client("glue", region_name="ap-northeast-2")
+    glue = boto3.client("glue", region_name=os.getenv("AWS_REGION", "ap-northeast-2"))
     results = []
 
     def fetch_table_data(tbl_name: str):
         table = glue.get_table(DatabaseName=database_name, Name=tbl_name)
-        location = table["Table"]["StorageDescriptor"].get("Location")
+        sd = table.get("Table", {}).get("StorageDescriptor", {})
+        location = sd.get("Location")
 
         if not location or not location.startswith("s3://"):
             return {
@@ -92,6 +136,7 @@ def get_glue_data(database_name: str, table_name: str = None, max_keys: int = 20
                 "location": location
             }
 
+        # s3://bucket/prefix -> bucket, prefix 분리
         s3_path = location.replace("s3://", "")
         parts = s3_path.split("/", 1)
         bucket = parts[0]
@@ -106,13 +151,16 @@ def get_glue_data(database_name: str, table_name: str = None, max_keys: int = 20
 
     if table_name:
         # 특정 테이블만 조회
-        return fetch_table_data(table_name)
+        try:
+            return fetch_table_data(table_name)
+        except Exception as e:
+            return {"table": table_name, "error": str(e)}
     else:
         # 모든 테이블 조회
         paginator = glue.get_paginator("get_tables")
         for page in paginator.paginate(DatabaseName=database_name):
             for tbl in page.get("TableList", []):
-                tbl_name = tbl["Name"]
+                tbl_name = tbl.get("Name")
                 try:
                     results.append(fetch_table_data(tbl_name))
                 except Exception as e:
@@ -122,6 +170,10 @@ def get_glue_data(database_name: str, table_name: str = None, max_keys: int = 20
                     })
         return results
 
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Redshift: 간단 조회
+# ──────────────────────────────────────────────────────────────────────────────
 def get_redshift_data(endpoint: str, port: int, db_name: str, user: str, password: str, table_name: str = None, limit: int = 50):
     conn = None
     results = []
@@ -164,48 +216,68 @@ def get_redshift_data(endpoint: str, port: int, db_name: str, user: str, passwor
             conn.close()
 
 
+# ──────────────────────────────────────────────────────────────────────────────
+# Kinesis: 최신 샤드에서 레코드 샘플링
+# ──────────────────────────────────────────────────────────────────────────────
 def get_kinesis_records(stream_name: str, shard_id: str = None, limit: int = 20):
-    client = boto3.client("kinesis", region_name="ap-northeast-2")
+    client = boto3.client("kinesis", region_name=os.getenv("AWS_REGION", "ap-northeast-2"))
 
-    if not shard_id:
-        shards = client.describe_stream_summary(StreamName=stream_name)
-        shard_response = client.describe_stream(StreamName=stream_name, Limit=1)
-        shard_id = shard_response["StreamDescription"]["Shards"][0]["ShardId"]
+    try:
+        if not shard_id:
+            # 샤드가 없을 수 있음
+            desc = client.describe_stream(StreamName=stream_name)
+            shards = desc.get("StreamDescription", {}).get("Shards", [])
+            if not shards:
+                return {"stream_name": stream_name, "error": "No shards in stream."}
+            shard_id = shards[0]["ShardId"]
 
-    shard_iterator = client.get_shard_iterator(
-        StreamName=stream_name,
-        ShardId=shard_id,
-        ShardIteratorType="LATEST"
-    )["ShardIterator"]
+        shard_iterator = client.get_shard_iterator(
+            StreamName=stream_name,
+            ShardId=shard_id,
+            ShardIteratorType="LATEST"
+        )["ShardIterator"]
 
-    response = client.get_records(ShardIterator=shard_iterator, Limit=limit)
+        response = client.get_records(ShardIterator=shard_iterator, Limit=limit)
 
-    records = []
-    for record in response.get("Records", []):
-        try:
-            payload = base64.b64decode(record["Data"]).decode("utf-8")
+        records = []
+        for record in response.get("Records", []):
             try:
-                payload = json.loads(payload)
+                payload = base64.b64decode(record["Data"]).decode("utf-8")
+                try:
+                    payload = json.loads(payload)
+                except Exception:
+                    pass
             except Exception:
-                pass
-        except Exception:
-            payload = str(record["Data"])
+                payload = str(record.get("Data"))
 
-        records.append({
-            "sequence_number": record["SequenceNumber"],
-            "partition_key": record["PartitionKey"],
-            "data": payload
-        })
+            records.append({
+                "sequence_number": record.get("SequenceNumber"),
+                "partition_key": record.get("PartitionKey"),
+                "data": payload
+            })
 
-    return {
-        "stream_name": stream_name,
-        "shard_id": shard_id,
-        "records": records
-    }
+        return {
+            "stream_name": stream_name,
+            "shard_id": shard_id,
+            "records": records
+        }
 
+    except ClientError as e:
+        return {"error": str(e), "stream_name": stream_name}
+    except Exception as e:
+        return {"error": str(e), "stream_name": stream_name}
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# SageMaker Feature Store: Offline Store(S3) 객체 샘플링
+# ──────────────────────────────────────────────────────────────────────────────
 def get_feature_group_data(feature_group_name: str, max_keys: int = 20):
-    sm = boto3.client("sagemaker", region_name="ap-northeast-2")
-    response = sm.describe_feature_group(FeatureGroupName=feature_group_name)
+    sm = boto3.client("sagemaker", region_name=os.getenv("AWS_REGION", "ap-northeast-2"))
+
+    try:
+        response = sm.describe_feature_group(FeatureGroupName=feature_group_name)
+    except ClientError as e:
+        return {"feature_group": feature_group_name, "error": str(e)}
 
     offline_store = response.get("OfflineStoreConfig", {}).get("S3StorageConfig", {})
     s3_uri = offline_store.get("ResolvedOutputS3Uri")
@@ -226,6 +298,10 @@ def get_feature_group_data(feature_group_name: str, max_keys: int = 20):
         "objects": objects
     }
 
+
+# ──────────────────────────────────────────────────────────────────────────────
+# RDS(Postgres): 간단 조회
+# ──────────────────────────────────────────────────────────────────────────────
 def get_rds_data(endpoint: str, port: int, db_name: str, user: str, password: str, table_name: str = None, limit: int = 50):
     conn = None
     results = []
@@ -267,21 +343,28 @@ def get_rds_data(endpoint: str, port: int, db_name: str, user: str, password: st
             conn.close()
 
 
+# ──────────────────────────────────────────────────────────────────────────────
+# MSK(Kafka): 간단 컨슈밍 샘플
+# ──────────────────────────────────────────────────────────────────────────────
 def get_msk_records(cluster_arn: str, topic: str, limit: int = 20):
-    client = boto3.client("kafka", region_name="ap-northeast-2")
-    brokers_info = client.get_bootstrap_brokers(ClusterArn=cluster_arn)
-    bootstrap_servers = brokers_info.get("BootstrapBrokerString")
+    client = boto3.client("kafka", region_name=os.getenv("AWS_REGION", "ap-northeast-2"))
+    try:
+        brokers_info = client.get_bootstrap_brokers(ClusterArn=cluster_arn)
+        bootstrap_servers = brokers_info.get("BootstrapBrokerString")
+        if not bootstrap_servers:
+            return {"error": "Bootstrap servers not found for cluster."}
+    except ClientError as e:
+        return {"error": str(e)}
 
-    if not bootstrap_servers:
-        return {"error": "Bootstrap servers not found for cluster."}
+    from kafka import KafkaConsumer  # 지연 임포트(실행 환경 없는 경우 대비)
 
     consumer = KafkaConsumer(
         topic,
         bootstrap_servers=bootstrap_servers,
-        auto_offset_reset="latest",  
+        auto_offset_reset="latest",
         enable_auto_commit=False,
-        consumer_timeout_ms=5000,   
-        security_protocol="PLAINTEXT"
+        consumer_timeout_ms=5000,
+        security_protocol="PLAINTEXT",
     )
 
     records = []
@@ -302,7 +385,7 @@ def get_msk_records(cluster_arn: str, topic: str, limit: int = 20):
                 "topic": msg.topic,
                 "partition": msg.partition,
                 "offset": msg.offset,
-                "key": msg.key.decode("utf-8") if msg.key else None,
+                "key": msg.key.decode("utf-8", errors="ignore") if msg.key else None,
                 "value": payload
             })
     finally:
@@ -310,10 +393,13 @@ def get_msk_records(cluster_arn: str, topic: str, limit: int = 20):
 
     return {"cluster_arn": cluster_arn, "topic": topic, "records": records}
 
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Redis: 키/타입별 샘플링
+# ──────────────────────────────────────────────────────────────────────────────
 def _try_parse_bytes(data: Optional[bytes]) -> Any:
     if data is None:
         return None
-    # 바이트 → 텍스트/JSON 추론
     try:
         txt = data.decode("utf-8")
         try:
@@ -321,8 +407,8 @@ def _try_parse_bytes(data: Optional[bytes]) -> Any:
         except Exception:
             return txt
     except Exception:
-        # 사람이 볼 수 있도록 앞부분만
         return {"raw_bytes_preview": str(data[:200]) + ("..." if len(data) > 200 else "")}
+
 
 def get_redis_data(
     host: str,
@@ -340,12 +426,12 @@ def get_redis_data(
             port=port,
             password=password,
             db=db,
-            socket_timeout=5,          
+            socket_timeout=5,
             socket_connect_timeout=5,
-            decode_responses=False,   
+            decode_responses=False,
         )
 
-        pong = r.ping()
+        _ = r.ping()  # 연결 확인
 
         results: List[Dict[str, Any]] = []
         scanned = 0
@@ -365,14 +451,14 @@ def get_redis_data(
                         "items": results,
                     }
 
-                k = key 
+                k = key
                 k_str = k.decode("utf-8", errors="ignore")
 
                 try:
-                    ktype = r.type(k) 
+                    ktype = r.type(k)
                     ktype_str = ktype.decode("utf-8")
 
-                    ttl = r.ttl(k) 
+                    ttl = r.ttl(k)
                     try:
                         mem = r.memory_usage(k)
                     except Exception:

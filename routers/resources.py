@@ -1,73 +1,77 @@
 # resources.py
-from fastapi import APIRouter
+from fastapi import APIRouter, Request, Response
 import asyncio
 import apps.collector as collector
+from utils.etag_utils import etag_response
 
 router = APIRouter()
 
+async def _run_with_etag(request: Request, response: Response, fn, *args):
+    data = await asyncio.to_thread(fn, *args)
+    return etag_response(request, response, data)
+
 @router.get("/s3-buckets")
-async def s3_buckets():
-    return await asyncio.to_thread(collector.get_s3_buckets)
+async def s3_buckets(request: Request, response: Response):
+    return await _run_with_etag(request, response, collector.get_s3_buckets)
 
 @router.get("/ebs-volumes")
-async def ebs_volumes():
-    return await asyncio.to_thread(collector.get_ebs_volumes)
+async def ebs_volumes(request: Request, response: Response):
+    return await _run_with_etag(request, response, collector.get_ebs_volumes)
 
 @router.get("/efs-filesystems")
-async def efs_filesystems():
-    return await asyncio.to_thread(collector.get_efs_filesystems)
+async def efs_filesystems(request: Request, response: Response):
+    return await _run_with_etag(request, response, collector.get_efs_filesystems)
 
 @router.get("/fsx-filesystems")
-async def fsx_filesystems():
-    return await asyncio.to_thread(collector.get_fsx_filesystems)
+async def fsx_filesystems(request: Request, response: Response):
+    return await _run_with_etag(request, response, collector.get_fsx_filesystems)
 
 @router.get("/rds-instances")
-async def rds_instances():
-    return await asyncio.to_thread(collector.get_rds_instances)
+async def rds_instances(request: Request, response: Response):
+    return await _run_with_etag(request, response, collector.get_rds_instances)
 
 @router.get("/dynamodb-tables")
-async def dynamodb_tables():
-    return await asyncio.to_thread(collector.get_dynamodb_tables)
+async def dynamodb_tables(request: Request, response: Response):
+    return await _run_with_etag(request, response, collector.get_dynamodb_tables)
 
 @router.get("/redshift-clusters")
-async def redshift_clusters():
-    return await asyncio.to_thread(collector.get_redshift_clusters)
+async def redshift_clusters(request: Request, response: Response):
+    return await _run_with_etag(request, response, collector.get_redshift_clusters)
 
 @router.get("/rds-snapshots")
-async def rds_snapshots():
-    return await asyncio.to_thread(collector.get_rds_snapshots)
+async def rds_snapshots(request: Request, response: Response):
+    return await _run_with_etag(request, response, collector.get_rds_snapshots)
 
 @router.get("/elasticache-clusters")
-async def elasticache_clusters():
-    return await asyncio.to_thread(collector.get_elasticache_clusters)
+async def elasticache_clusters(request: Request, response: Response):
+    return await _run_with_etag(request, response, collector.get_elasticache_clusters)
 
 @router.get("/glacier-vaults")
-async def glacier_vaults():
-    return await asyncio.to_thread(collector.get_glacier_vaults)
+async def glacier_vaults(request: Request, response: Response):
+    return await _run_with_etag(request, response, collector.get_glacier_vaults)
 
 @router.get("/backup-plans")
-async def backup_plans():
-    return await asyncio.to_thread(collector.get_backup_plans)
+async def backup_plans(request: Request, response: Response):
+    return await _run_with_etag(request, response, collector.get_backup_plans)
 
 @router.get("/feature-groups")
-async def sagemaker_feature_groups():
-    return await asyncio.to_thread(collector.get_sagemaker_feature_group)
+async def sagemaker_feature_groups(request: Request, response: Response):
+    return await _run_with_etag(request, response, collector.get_sagemaker_feature_group)
 
 @router.get("/glue-databases")
-async def glue_databases():
-    return await asyncio.to_thread(collector.get_glue_catalog_database)
+async def glue_databases(request: Request, response: Response):
+    return await _run_with_etag(request, response, collector.get_glue_catalog_database)
 
 @router.get("/kinesis-streams")
-async def kinesis_streams():
-    return await asyncio.to_thread(collector.get_kinesis_stream)
+async def kinesis_streams(request: Request, response: Response):
+    return await _run_with_etag(request, response, collector.get_kinesis_stream)
 
 @router.get("/msk-clusters")
-async def msk_clusters():
-    return await asyncio.to_thread(collector.get_msk_cluster)
+async def msk_clusters(request: Request, response: Response):
+    return await _run_with_etag(request, response, collector.get_msk_cluster)
 
-# 전체 리소스를 한 번에 반환하는 API
 @router.get("/all-resources")
-async def all_resources():
+async def all_resources(request: Request, response: Response):
     (
         s3_buckets,
         ebs_volumes,
@@ -102,7 +106,7 @@ async def all_resources():
         asyncio.to_thread(collector.get_msk_cluster),
     )
 
-    return {
+    data = {
         "s3_buckets": s3_buckets,
         "ebs_volumes": ebs_volumes,
         "efs_filesystems": efs_filesystems,
@@ -119,3 +123,4 @@ async def all_resources():
         "kinesis_streams": kinesis_streams,
         "msk_clusters": msk_clusters,
     }
+    return etag_response(request, response, data)
