@@ -1,0 +1,21 @@
+# docker-compose.yml (옵션: ~/.aws 마운트 & 포트 노출 예시)
+services:
+  dspm-data-collector:
+    build: .
+    image: dspm-data-collector:latest
+    container_name: dspm-data-collector
+    ports:
+      - "8103:8103"
+    environment:
+      # 환경변수 방식 사용 시:
+      # AWS_ACCESS_KEY_ID: "AKIA..."
+      # AWS_SECRET_ACCESS_KEY: "..."
+      # AWS_SESSION_TOKEN: "..."
+      AWS_DEFAULT_REGION: "ap-northeast-2"
+      PORT: "8103"
+      # 필요 시 CORS 허용 오리진 추가(쉼표 구분)
+      # CORS_ALLOW_ORIGINS: "http://localhost:3000,http://211.44.183.248:8200"
+    volumes:
+      # 로컬 AWS 자격증명 사용 시 (권장)
+      - ~/.aws:/home/appuser/.aws:ro
+    restart: unless-stopped
