@@ -1,5 +1,5 @@
 # collector.py
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 import pandas as pd
 import boto3
 import os
@@ -9,7 +9,9 @@ engine = create_engine("postgresql://steampipe@localhost:9193/steampipe")
 
 def fetch(query: str):
     """Steampipe PostgreSQL에서 쿼리 실행 후 결과 반환"""
-    df = pd.read_sql(query, engine)
+    # SQLAlchemy 2.x + pandas 호환: text() 래핑 + 명시적 커넥션
+    with engine.connect() as conn:
+        df = pd.read_sql_query(text(query), conn, params=())
     return df.to_dict(orient="records")
 
 # --- opt-in 리전 로딩 & 필터 헬퍼 ---
@@ -49,7 +51,6 @@ def az_matches_allowed(alias: str = "") -> str:
     col = f"{alias}.availability_zone" if alias else "availability_zone"
     if not ALLOWED_REGIONS:
         return "1=1"
-    # VALUES 테이블로 다대다 LIKE 매칭
     values_rows = ", ".join(f"('{r}')" for r in ALLOWED_REGIONS)
     return f"""exists (
         select 1
