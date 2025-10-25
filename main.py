@@ -3,7 +3,6 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from routers import resources, repository, explorer_router
 import os
-from routers import mlops_ranker
 
 app = FastAPI(title="AWS Resource Collector API")
 
@@ -36,7 +35,6 @@ app.add_middleware(
 app.include_router(resources.router,  prefix="/api", tags=["AWS Resources"])
 app.include_router(repository.router, prefix="/api", tags=["Repository Detail"])
 app.include_router(explorer_router.router, prefix="/api", tags=["Repository Explorer"])
-app.include_router(mlops_ranker.router,  prefix="/api")
 
 @app.get("/health", tags=["Health"])
 async def health():

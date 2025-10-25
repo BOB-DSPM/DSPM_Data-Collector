@@ -1,9 +1,8 @@
+# resources.py
 from fastapi import APIRouter, Request, Response
 import asyncio
 import apps.collector as collector
-import apps.mlops_storage as mlops_storage
 from utils.etag_utils import etag_response
-from apps import mlops_ranker
 
 router = APIRouter()
 
@@ -71,11 +70,6 @@ async def kinesis_streams(request: Request, response: Response):
 async def msk_clusters(request: Request, response: Response):
     return await _run_with_etag(request, response, collector.get_msk_cluster)
 
-@router.get("/mlops-storage")
-async def mlops_storage_map(request: Request, response: Response):
-    """SageMaker 파이프라인에 '실제 연결된' 저장소 종합 맵"""
-    return await _run_with_etag(request, response, mlops_storage.get_sagemaker_mlops_storage_map)
-
 @router.get("/all-resources")
 async def all_resources(request: Request, response: Response):
     (
@@ -94,7 +88,6 @@ async def all_resources(request: Request, response: Response):
         glue_databases,
         kinesis_streams,
         msk_clusters,
-        mlops_storage_map_value,
     ) = await asyncio.gather(
         asyncio.to_thread(collector.get_s3_buckets),
         asyncio.to_thread(collector.get_ebs_volumes),
@@ -111,7 +104,6 @@ async def all_resources(request: Request, response: Response):
         asyncio.to_thread(collector.get_glue_catalog_database),
         asyncio.to_thread(collector.get_kinesis_stream),
         asyncio.to_thread(collector.get_msk_cluster),
-        asyncio.to_thread(mlops_storage.get_sagemaker_mlops_storage_map),
     )
 
     data = {
@@ -130,9 +122,5 @@ async def all_resources(request: Request, response: Response):
         "glue_databases": glue_databases,
         "kinesis_streams": kinesis_streams,
         "msk_clusters": msk_clusters,
-        "mlops_storage": mlops_storage_map_value,
     }
-
-    # 점수/메타 주입 (CloudTrail 가중치 낮춤 + MLOps 식별/미식별 분류 포함)
-    data = mlops_ranker.annotate_all(data, lookback_days=14)
     return etag_response(request, response, data)

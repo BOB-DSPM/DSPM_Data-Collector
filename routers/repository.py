@@ -1,9 +1,7 @@
-# routers/repository.py
-from fastapi import APIRouter, HTTPException, Request, Response, Query  # ← Query 추가
+from fastapi import APIRouter, HTTPException, Request, Response
 import asyncio
 import apps.inspector as inspector
 from utils.etag_utils import etag_response
-from apps import mlops_ranker  # ← 랭커 임포트
 
 router = APIRouter()
 
@@ -12,23 +10,8 @@ async def _run_with_etag(request: Request, response: Response, fn, *args):
     return etag_response(request, response, data)
 
 @router.get("/repositories/s3/{bucket_name}")
-async def s3_bucket_detail(
-    bucket_name: str,
-    request: Request,
-    response: Response,
-    days: int = Query(14, ge=1, le=90, description="CloudTrail 조회 일수(최대 90)")
-):
-    """
-    S3 버킷 단건 상세 + 점수/메타(_meta) 주입
-    """
-    # 1) 원본 상세 조회
-    records = await asyncio.to_thread(inspector.get_s3_bucket_detail, bucket_name)
-
-    # 2) 점수/식별 메타 주입
-    annotated = await asyncio.to_thread(mlops_ranker.annotate_s3_records, records, days)
-
-    # 3) ETag 응답
-    return etag_response(request, response, annotated)
+async def s3_bucket_detail(bucket_name: str, request: Request, response: Response):
+    return await _run_with_etag(request, response, inspector.get_s3_bucket_detail, bucket_name)
 
 @router.get("/repositories/efs/{file_system_id}")
 async def efs_detail(file_system_id: str, request: Request, response: Response):
