@@ -10,7 +10,7 @@ async def _run_with_etag(request: Request, response: Response, fn, *args):
     return etag_response(request, response, data)
 
 @router.get("/explorer/s3/{bucket_name}")
-async def s3_all_objects(bucket_name: str, request: Request, response: Response, prefix: str = "", max_keys: int = Query(10, le=100)):
+async def s3_all_objects(bucket_name: str, request: Request, response: Response, prefix: str = "", max_keys: int = Query(10, le=10000000)):
     return await _run_with_etag(request, response, explorer.get_s3_all_objects_content, bucket_name, prefix, max_keys)
 
 @router.get("/explorer/dynamodb/{table_name}")

@@ -18,7 +18,7 @@ from botocore.exceptions import ClientError, NoCredentialsError, EndpointConnect
 # - 버킷 미존재/권한/네트워크 등의 예외는 JSON 에러로 반환
 # - 각 객체별 파싱 실패는 해당 객체 요소에 error 필드로 기록
 # ──────────────────────────────────────────────────────────────────────────────
-def get_s3_all_objects_content(bucket_name: str, prefix: str = "", max_keys: int = 100):
+def get_s3_all_objects_content(bucket_name: str, prefix: str = "", max_keys: int = 1000000000):
     client = boto3.client("s3", region_name=os.getenv("AWS_REGION", "ap-northeast-2"))
     paginator = client.get_paginator("list_objects_v2")
 
