@@ -9,28 +9,8 @@ STEAMPIPE_CFG_DIR="${HOME_DIR}/.steampipe/config"
 mkdir -p "${AWS_DIR}" "${STEAMPIPE_CFG_DIR}"
 
 # ===== 1) AWS CLI non-interactive configure =====
-# 환경변수로 넘어온 자격증명이 있으면 credentials/config 생성
-# (이미 파일이 있으면 보존)
-if [[ -n "${AWS_ACCESS_KEY_ID:-}" && -n "${AWS_SECRET_ACCESS_KEY:-}" ]]; then
-  echo "[i] writing AWS credentials to ${AWS_DIR}/credentials"
-  cat > "${AWS_DIR}/credentials" <<EOF
-[default]
-aws_access_key_id=${AWS_ACCESS_KEY_ID}
-aws_secret_access_key=${AWS_SECRET_ACCESS_KEY}
-${AWS_SESSION_TOKEN:+aws_session_token=${AWS_SESSION_TOKEN}}
-EOF
-
-  # region은 config에
-  REGION_VAL="${AWS_DEFAULT_REGION:-ap-northeast-2}"
-  echo "[i] writing AWS config to ${AWS_DIR}/config (region=${REGION_VAL})"
-  cat > "${AWS_DIR}/config" <<EOF
-[default]
-region = ${REGION_VAL}
-output = json
-EOF
-fi
-
-# 권한 정리
+# IAM Role (IRSA/ECS) 또는 마운트된 ~/.aws 파일을 그대로 사용.
+# 필요한 경우 사용자가 직접 ${HOME}/.aws 를 마운트하거나 사전에 구성해야 함.
 chmod 600 "${AWS_DIR}/credentials" 2>/dev/null || true
 chmod 600 "${AWS_DIR}/config" 2>/dev/null || true
 

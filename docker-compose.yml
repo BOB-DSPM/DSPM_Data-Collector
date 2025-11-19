@@ -7,10 +7,6 @@ services:
     ports:
       - "8103:8103"
     environment:
-      # 환경변수 방식 사용 시:
-      # AWS_ACCESS_KEY_ID: "AKIA..."
-      # AWS_SECRET_ACCESS_KEY: "..."
-      # AWS_SESSION_TOKEN: "..."
       AWS_DEFAULT_REGION: "ap-northeast-2"
       PORT: "8103"
       # 필요 시 CORS 허용 오리진 추가(쉼표 구분)

@@ -133,15 +133,20 @@ docker run -d \
   dspm-data-collector
 ```
 
+> 프로덕션 환경(EKS/ECS/Fargate 등)에서는 컨테이너에 IAM Role을 연결해 자격 증명을 안전하게 위임하세요.
+
 ## 환경 변수
 
 | 변수 | 설명 | 기본값 |
 |------|------|--------|
-| `PORT` | API 서버 포트 | 8103 |
-| `AWS_DEFAULT_REGION` | AWS 리전 | ap-northeast-2 |
-| `CORS_ALLOW_ORIGINS` | CORS 허용 오리진 (쉼표 구분) | localhost:3000 등 |
-| `AWS_ACCESS_KEY_ID` | AWS 액세스 키 (선택) | - |
-| `AWS_SECRET_ACCESS_KEY` | AWS 시크릿 키 (선택) | - |
+| `PORT` | FastAPI 서버 포트 | 8103 |
+| `AWS_DEFAULT_REGION` / `AWS_REGION` | boto3 및 Steampipe 기본 리전 | ap-northeast-2 |
+| `ALLOWED_REGIONS` | Steampipe 쿼리 허용 리전(쉼표 구분) | Opt-in 리전 자동 감지 |
+| `STEAMPIPE_DB_HOST` / `STEAMPIPE_DB_PORT` / `STEAMPIPE_DB_USER` / `STEAMPIPE_DB_NAME` | Steampipe PostgreSQL 연결 정보 | 127.0.0.1 / 9193 / steampipe / steampipe |
+| `CORS_DEFAULT_ORIGINS` | 기본 허용 오리진 목록 | 로컬 개발 주소 4개 |
+| `CORS_ALLOW_ORIGINS` | 추가 허용 오리진(쉼표 구분) | 빈 문자열 |
+| `CORS_ALLOW_ALL` | `true` 시 모든 오리진 허용(`credentials=False` 필요) | `false` |
+| `SESSION_TTL_SEC`, `SESSION_CACHE_MAX`, `REDIS_URL` | 응답 캐시 제어 | 600 / 512 / 인메모리 |
 
 **CORS 설정 예시:**
 ```bash
@@ -269,22 +274,22 @@ GET /api/repositories/dynamodb/{table_name}
 
 ### AWS 자격 증명
 
-**방법 1: AWS CLI 프로필 사용 (권장)**
-```bash
-aws configure
-```
+1. **IAM Role 사용 (권장)**  
+   - Amazon EKS: 서비스 계정에 IAM Role(IRSA)을 연결합니다.  
+   - Amazon ECS/Fargate: 태스크 실행 역할에 필요한 `ReadOnly` 정책을 부여합니다.  
+   컨테이너는 메타데이터 서비스를 통해 임시 자격 증명을 자동으로 획득하므로 추가 설정이 필요 없습니다.
 
-**방법 2: 환경 변수**
-```bash
-export AWS_ACCESS_KEY_ID=your_key
-export AWS_SECRET_ACCESS_KEY=your_secret
-export AWS_DEFAULT_REGION=ap-northeast-2
-```
-
-**방법 3: Docker 볼륨 마운트**
-```bash
-docker run -v ~/.aws:/home/appuser/.aws:ro ...
-```
+2. **로컬/테스트 환경 (AWS CLI 프로필 + 볼륨 마운트)**  
+   ```bash
+   aws configure --profile dspm
+   export AWS_PROFILE=dspm
+   docker run -d \
+     -p 8103:8103 \
+     -e AWS_PROFILE=$AWS_PROFILE \
+     -v ~/.aws:/home/appuser/.aws:ro \
+     dspm-data-collector
+   ```
+   `~/.aws` 디렉터리를 읽기 전용으로 마운트하여 컨테이너가 로컬 프로필을 사용할 수 있게 합니다.
 
 ### Steampipe 서비스
 
@@ -376,9 +381,7 @@ python -m uvicorn main:app --host 0.0.0.0 --port $PORT
 ```bash
 # 볼륨 마운트 확인
 docker run -v ~/.aws:/home/appuser/.aws:ro ...
-
-# 또는 환경 변수 직접 전달
-docker run -e AWS_ACCESS_KEY_ID=... -e AWS_SECRET_ACCESS_KEY=... ...
+# 또는 EKS/ECS 등의 실행 환경에 연결된 IAM Role 권한 확인
 ```
 
 ## 아키텍처
