@@ -496,4 +496,4 @@ GET /api/repositories/msk/{cluster_name}
 ## 주의사항
 반드시 steampipe service start 로 로컬 Steampipe 서버가 실행 중이어야 합니다.
 
-AWS 자격증명은 CLI에서 동작하는 형태와 동일하게 설정되어야 합니다.
+AWS 자격증명은 CLI에서 동작하는 형태와 동일하게 설정되어야 합니다!
