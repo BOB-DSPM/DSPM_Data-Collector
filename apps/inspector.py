@@ -2,9 +2,29 @@
 from sqlalchemy import create_engine
 import pandas as pd
 import boto3
+import os
 
 # Steampipe 연결
-engine = create_engine("postgresql://steampipe@localhost:9193/steampipe")
+def _build_steampipe_url() -> str:
+    url = os.getenv("STEAMPIPE_DB_URL")
+    if url:
+        return url
+
+    user = os.getenv("STEAMPIPE_DB_USER", "steampipe")
+    password = os.getenv("STEAMPIPE_DB_PASSWORD", "")
+    host = os.getenv("STEAMPIPE_DB_HOST", "localhost")
+    port = os.getenv("STEAMPIPE_DB_PORT", "9193")
+    name = os.getenv("STEAMPIPE_DB_NAME", "steampipe")
+    credentials = f"{user}:{password}" if password else user
+    return f"postgresql://{credentials}@{host}:{port}/{name}"
+
+engine = create_engine(_build_steampipe_url())
+
+DEFAULT_BOTO_REGION = (
+    os.getenv("AWS_REGION")
+    or os.getenv("AWS_DEFAULT_REGION")
+    or "ap-northeast-2"
+)
 
 def fetch(query: str):
     df = pd.read_sql(query, engine)
@@ -85,7 +105,7 @@ def get_backup_plan_detail(plan_id: str):
 # ---------- boto3 API 호출 상세 ----------
 
 def get_sagemaker_feature_group_detail(feature_group_name: str):
-    client = boto3.client("sagemaker", region_name="ap-northeast-2")
+    client = boto3.client("sagemaker", region_name=DEFAULT_BOTO_REGION)
     response = client.describe_feature_group(FeatureGroupName=feature_group_name)
     return response
 

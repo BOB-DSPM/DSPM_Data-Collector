@@ -12,6 +12,7 @@ from typing import Any, Dict, List, Optional
 
 from botocore.exceptions import ClientError, NoCredentialsError, EndpointConnectionError
 
+AWS_REGION = os.getenv("AWS_REGION") or os.getenv("AWS_DEFAULT_REGION") or "ap-northeast-2"
 
 # ──────────────────────────────────────────────────────────────────────────────
 # S3: 버킷/프리픽스에서 객체 본문을 일부 수집 (최대 max_keys)
@@ -19,7 +20,7 @@ from botocore.exceptions import ClientError, NoCredentialsError, EndpointConnect
 # - 각 객체별 파싱 실패는 해당 객체 요소에 error 필드로 기록
 # ──────────────────────────────────────────────────────────────────────────────
 def get_s3_all_objects_content(bucket_name: str, prefix: str = "", max_keys: int = 1000000000):
-    client = boto3.client("s3", region_name=os.getenv("AWS_REGION", "ap-northeast-2"))
+    client = boto3.client("s3", region_name=AWS_REGION)
     paginator = client.get_paginator("list_objects_v2")
 
     results: List[Dict[str, Any]] = []
@@ -103,7 +104,7 @@ def get_s3_all_objects_content(bucket_name: str, prefix: str = "", max_keys: int
 # DynamoDB: 간단 스캔(페이지 단위)
 # ──────────────────────────────────────────────────────────────────────────────
 def get_dynamodb_items(table_name: str, limit: int = 50, last_key: dict = None):
-    client = boto3.client("dynamodb", region_name=os.getenv("AWS_REGION", "ap-northeast-2"))
+    client = boto3.client("dynamodb", region_name=AWS_REGION)
     params = {"TableName": table_name, "Limit": limit}
     if last_key:
         params["ExclusiveStartKey"] = last_key
@@ -121,7 +122,7 @@ def get_dynamodb_items(table_name: str, limit: int = 50, last_key: dict = None):
 # Glue: 테이블 S3 Location 따라 S3 내용 샘플링
 # ──────────────────────────────────────────────────────────────────────────────
 def get_glue_data(database_name: str, table_name: str = None, max_keys: int = 20):
-    glue = boto3.client("glue", region_name=os.getenv("AWS_REGION", "ap-northeast-2"))
+    glue = boto3.client("glue", region_name=AWS_REGION)
     results = []
 
     def fetch_table_data(tbl_name: str):
@@ -220,7 +221,7 @@ def get_redshift_data(endpoint: str, port: int, db_name: str, user: str, passwor
 # Kinesis: 최신 샤드에서 레코드 샘플링
 # ──────────────────────────────────────────────────────────────────────────────
 def get_kinesis_records(stream_name: str, shard_id: str = None, limit: int = 20):
-    client = boto3.client("kinesis", region_name=os.getenv("AWS_REGION", "ap-northeast-2"))
+    client = boto3.client("kinesis", region_name=AWS_REGION)
 
     try:
         if not shard_id:
@@ -272,7 +273,7 @@ def get_kinesis_records(stream_name: str, shard_id: str = None, limit: int = 20)
 # SageMaker Feature Store: Offline Store(S3) 객체 샘플링
 # ──────────────────────────────────────────────────────────────────────────────
 def get_feature_group_data(feature_group_name: str, max_keys: int = 20):
-    sm = boto3.client("sagemaker", region_name=os.getenv("AWS_REGION", "ap-northeast-2"))
+    sm = boto3.client("sagemaker", region_name=AWS_REGION)
 
     try:
         response = sm.describe_feature_group(FeatureGroupName=feature_group_name)
@@ -347,7 +348,7 @@ def get_rds_data(endpoint: str, port: int, db_name: str, user: str, password: st
 # MSK(Kafka): 간단 컨슈밍 샘플
 # ──────────────────────────────────────────────────────────────────────────────
 def get_msk_records(cluster_arn: str, topic: str, limit: int = 20):
-    client = boto3.client("kafka", region_name=os.getenv("AWS_REGION", "ap-northeast-2"))
+    client = boto3.client("kafka", region_name=AWS_REGION)
     try:
         brokers_info = client.get_bootstrap_brokers(ClusterArn=cluster_arn)
         bootstrap_servers = brokers_info.get("BootstrapBrokerString")

@@ -8,7 +8,12 @@ ENV DEBIAN_FRONTEND=noninteractive \
     STEAMPIPE_UPDATE_CHECK=false \
     PORT=8103 \
     STEAMPIPE_DB_HOST=127.0.0.1 \
-    STEAMPIPE_DB_PORT=9193
+    STEAMPIPE_DB_PORT=9193 \
+    STEAMPIPE_DB_USER=steampipe \
+    STEAMPIPE_DB_NAME=steampipe \
+    CORS_DEFAULT_ORIGINS="http://localhost:3000,http://127.0.0.1:3000,http://localhost:8103,http://127.0.0.1:8103" \
+    CORS_ALLOW_ALL= \
+    AWS_DEFAULT_REGION=ap-northeast-2
 
 # 필수 패키지 + tini + unzip (AWS CLI 설치용)
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -61,7 +66,7 @@ RUN if [ -f /app/entrypoint.sh ]; then \
       sed -i '1s/^\xEF\xBB\xBF//' /app/entrypoint.sh ; \
     else \
       echo '#!/usr/bin/env bash' > /app/entrypoint.sh && \
-      echo 'exec python -m uvicorn apps.main:app --host 0.0.0.0 --port ${PORT:-8103}' >> /app/entrypoint.sh && \
+      echo 'exec python -m uvicorn apps.main:app --host 0.0.0.0 --port ${PORT:-8000}' >> /app/entrypoint.sh && \
       chmod +x /app/entrypoint.sh ; \
     fi
 

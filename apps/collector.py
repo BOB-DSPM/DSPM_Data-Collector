@@ -15,7 +15,20 @@ if not logger.handlers:
 # ------------------------------------------------------------
 # Steampipe PostgreSQL 연결
 # ------------------------------------------------------------
-engine = create_engine("postgresql://steampipe@localhost:9193/steampipe")
+def _build_steampipe_url() -> str:
+    url = os.getenv("STEAMPIPE_DB_URL")
+    if url:
+        return url
+
+    user = os.getenv("STEAMPIPE_DB_USER", "steampipe")
+    password = os.getenv("STEAMPIPE_DB_PASSWORD", "")
+    host = os.getenv("STEAMPIPE_DB_HOST", "localhost")
+    port = os.getenv("STEAMPIPE_DB_PORT", "9193")
+    name = os.getenv("STEAMPIPE_DB_NAME", "steampipe")
+    credentials = f"{user}:{password}" if password else user
+    return f"postgresql://{credentials}@{host}:{port}/{name}"
+
+engine = create_engine(_build_steampipe_url())
 
 def fetch(query: str):
     """
@@ -62,6 +75,12 @@ def get_opted_in_regions():
     return [r["region"] for r in rows]
 
 ALLOWED_REGIONS = get_opted_in_regions() or ["ap-northeast-2"]  # 안전 기본값
+
+DEFAULT_BOTO_REGION = (
+    os.getenv("AWS_REGION")
+    or os.getenv("AWS_DEFAULT_REGION")
+    or (ALLOWED_REGIONS[0] if ALLOWED_REGIONS else "ap-northeast-2")
+)
 
 def region_in_clause(alias: str = "") -> str:
     """region 컬럼이 있는 테이블에서 쓰는 WHERE 절 스니펫."""
@@ -202,8 +221,7 @@ def get_msk_cluster():
 # ------------------------------------------------------------
 def get_sagemaker_feature_group():
     # boto3는 코드에 리전 고정 or ALLOWED_REGIONS 첫 번째 사용
-    region = os.getenv("AWS_REGION") or (ALLOWED_REGIONS[0] if ALLOWED_REGIONS else "ap-northeast-2")
-    client = boto3.client("sagemaker", region_name=region)
+    client = boto3.client("sagemaker", region_name=DEFAULT_BOTO_REGION)
     resp = client.list_feature_groups()
     return {
         fg["FeatureGroupName"]: {

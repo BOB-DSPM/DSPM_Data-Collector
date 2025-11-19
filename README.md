@@ -1,3 +1,41 @@
+# Docker 배포
+```bash
+# 1) 이미지 빌드
+docker build -t comnyang/sage-collector:latest .
+
+# 2) 컨테이너 실행 (필요한 환경변수는 상황에 맞게 수정)
+docker run -d --name sage-collector \
+  -p 8000:8000 \
+  -e PORT=8000 \
+  -e AWS_ACCESS_KEY_ID=YOUR_KEY \
+  -e AWS_SECRET_ACCESS_KEY=YOUR_SECRET \
+  -e AWS_DEFAULT_REGION=ap-northeast-2 \
+  comnyang/sage-collector:latest
+
+# 3) 로그 확인 (파일로 저장하고 싶다면 tee 사용)
+docker logs -f sage-collector | tee log.txt
+
+# 4) Docker Hub 업로드
+docker login --username comnyang
+docker push comnyang/sage-collector:latest
+```
+
+## 주요 환경 변수
+| 이름 | 설명 | 기본값/비고 |
+| --- | --- | --- |
+| `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_SESSION_TOKEN` | Steampipe와 boto3가 사용할 IAM 자격 증명 | 없음 |
+| `AWS_REGION` / `AWS_DEFAULT_REGION` | boto3 기본 리전 | `ap-northeast-2` |
+| `ALLOWED_REGIONS` | Steampipe 쿼리에서 허용할 리전 (쉼표 구분) | Opt-in 리전 자동 조회 |
+| `PORT` | FastAPI/uvicorn 포트 | `8103` |
+| `STEAMPIPE_DB_URL` | Steampipe PostgreSQL 전체 DSN | 없으면 아래 항목 사용 |
+| `STEAMPIPE_DB_HOST` / `STEAMPIPE_DB_PORT` / `STEAMPIPE_DB_USER` / `STEAMPIPE_DB_PASSWORD` / `STEAMPIPE_DB_NAME` | Steampipe 서비스 위치 | `127.0.0.1:9193`, `steampipe`, 빈 패스워드 |
+| `CORS_DEFAULT_ORIGINS` | 기본 허용 오리진 목록 | 로컬 dev 주소 4개 |
+| `CORS_ALLOW_ORIGINS` | 추가 허용 오리진 목록 | 빈 문자열 |
+| `CORS_ALLOW_ALL` | `true`면 `allow_origins=["*"]` (credentials 금지) | `false` |
+| `SESSION_TTL_SEC`, `SESSION_CACHE_MAX`, `REDIS_URL` | API 응답 캐시 제어 | 600초, 512, 미사용 시 인메모리 |
+
+---
+
 # Steampipe 설치
 ### macOS 
 ```bash
