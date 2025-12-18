@@ -69,12 +69,18 @@ def get_opted_in_regions():
         regions = [r.strip() for r in env.split(",") if r.strip()]
         return regions
 
-    rows = fetch("""
-        select region
-        from aws_region
-        where opt_in_status in ('opted-in', 'opt-in-not-required')
-    """)
-    return [r["region"] for r in rows]
+    try:
+        rows = fetch("""
+            select region
+            from aws_region
+            where opt_in_status in ('opted-in', 'opt-in-not-required')
+        """)
+        return [r["region"] for r in rows]
+    except Exception as e:
+        # 연결 실패 시 서비스가 부팅조차 되지 않는 문제를 막기 위한 안전 장치
+        fallback = os.getenv("AWS_REGION") or os.getenv("AWS_DEFAULT_REGION") or "ap-northeast-2"
+        logger.warning(f"Steampipe region lookup failed: {e}. Falling back to [{fallback}]")
+        return [fallback]
 
 ALLOWED_REGIONS = get_opted_in_regions() or ["ap-northeast-2"]  # 안전 기본값
 
