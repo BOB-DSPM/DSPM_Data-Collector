@@ -95,7 +95,8 @@ RUN if [ -f /app/entrypoint.sh ]; then \
       sed -i '1s/^\xEF\xBB\xBF//' /app/entrypoint.sh ; \
     else \
       echo '#!/usr/bin/env bash' > /app/entrypoint.sh && \
-      echo 'exec python -m uvicorn apps.main:app --host 0.0.0.0 --port ${PORT:-8103}' >> /app/entrypoint.sh && \
+      echo 'UVICORN_BIN="${VIRTUAL_ENV:-/opt/venv}/bin/uvicorn"' >> /app/entrypoint.sh && \
+      echo 'exec "${UVICORN_BIN}" main:app --host 0.0.0.0 --port ${PORT:-8103}' >> /app/entrypoint.sh && \
       chmod +x /app/entrypoint.sh ; \
     fi
 

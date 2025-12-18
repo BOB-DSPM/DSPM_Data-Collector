@@ -38,4 +38,5 @@ done
 # 3) Collector API 기동 (uvicorn)
 #    ※ 모듈/경로는 실제 앱 엔트리포인트로 맞춰주세요.
 log "Starting Collector API on 0.0.0.0:${PORT} ..."
-exec uvicorn main:app --host 0.0.0.0 --port "${PORT}" --workers 2
+UVICORN_BIN="${VIRTUAL_ENV:-/opt/venv}/bin/uvicorn"
+exec "${UVICORN_BIN}" main:app --host 0.0.0.0 --port "${PORT}" --workers 2
