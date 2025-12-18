@@ -1,5 +1,8 @@
 # collector.py
 from sqlalchemy import create_engine, text
+from sqlalchemy.exc import OperationalError
+import numpy as np
+import math
 import pandas as pd
 import boto3
 import os
@@ -45,19 +48,37 @@ def fetch(query: str):
         "AccessDeniedException",
         "Throttling",  # 혹시 모를 과금/제한
     )
-    with engine.connect() as conn:
-        try:
-            df = pd.read_sql_query(text(query), conn, params=())
-            # pandas -> dict 변환 시 NaN/NaT가 그대로 남으면 JSON 직렬화에서 ValueError 발생하므로 None으로 치환
-            df = df.where(pd.notnull(df), None)
-            return df.to_dict(orient="records")
-        except Exception as e:
-            msg = str(e)
-            if any(m in msg for m in SKIP_MARKERS):
-                logger.warning(f"Steampipe query skipped (opt-in/permission): {msg.splitlines()[0]}")
-                return []
-            # 알 수 없는 예외는 그대로 올림(디버그 필요)
-            raise
+    try:
+        with engine.connect() as conn:
+            try:
+                df = pd.read_sql_query(text(query), conn, params=())
+                # pandas -> dict 변환 시 NaN/NaT/inf가 남으면 JSON 직렬화에서 ValueError 발생하므로 None으로 치환
+                df = df.replace({np.nan: None, np.inf: None, -np.inf: None})
+                df = df.where(pd.notnull(df), None)
+                data = df.to_dict(orient="records")
+
+                def _sanitize(val):
+                    if isinstance(val, float):
+                        if math.isnan(val) or math.isinf(val):
+                            return None
+                        return val
+                    if isinstance(val, list):
+                        return [_sanitize(v) for v in val]
+                    if isinstance(val, dict):
+                        return {k: _sanitize(v) for k, v in val.items()}
+                    return val
+
+                return [_sanitize(row) for row in data]
+            except Exception as e:
+                msg = str(e)
+                if any(m in msg for m in SKIP_MARKERS):
+                    logger.warning(f"Steampipe query skipped (opt-in/permission): {msg.splitlines()[0]}")
+                    return []
+                # 알 수 없는 예외는 그대로 올림(디버그 필요)
+                raise
+    except OperationalError as e:
+        logger.error(f"Steampipe connection failed: {e}")
+        return []
 
 # ------------------------------------------------------------
 # opt-in 리전 로딩 & 필터 헬퍼

@@ -84,6 +84,8 @@ RUN set -e; \
 RUN su - appuser -c "steampipe --version" \
  && su - appuser -c "steampipe plugin install aws"
 
+RUN su - appuser -c "steampipe service start"
+
 # 실행 전 AWS/Steampipe 자동 설정 스크립트 정리
 RUN chmod +x /app/docker/aws-init.sh \
  && sed -i 's/\r$//' /app/docker/aws-init.sh

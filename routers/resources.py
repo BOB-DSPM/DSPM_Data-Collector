@@ -10,6 +10,35 @@ from utils.caching import maybe_return_cached, store_response_to_cache
 router = APIRouter()
 DEFAULT_TTL = 600  # 초
 
+
+def _sanitize_value(val):
+    """JSON 직렬화가 안 되는 NaN/inf 등을 None으로 치환"""
+    try:
+        import math
+        import numpy as np  # type: ignore
+    except Exception:
+        math = None
+        np = None
+
+    if isinstance(val, float):
+        if (math and (math.isnan(val) or math.isinf(val))):
+            return None
+        return val
+    # numpy 숫자 타입 방어
+    if "numpy" in val.__class__.__module__:
+        try:
+            if np and (np.isnan(val) or np.isinf(val)):
+                return None
+            return val.item()  # 가능하면 파이썬 스칼라로
+        except Exception:
+            pass
+    if isinstance(val, list):
+        return [_sanitize_value(v) for v in val]
+    if isinstance(val, dict):
+        return {k: _sanitize_value(v) for k, v in val.items()}
+    return val
+
+
 async def _run_with_cache_and_etag(
     request: Request,
     response: Response,
@@ -20,10 +49,12 @@ async def _run_with_cache_and_etag(
     # 1) 캐시 조회
     cached = await maybe_return_cached(request, response, ttl=ttl_sec)
     if cached is not None:
-        return etag_response(request, response, cached)
+        sanitized = _sanitize_value(cached)
+        return etag_response(request, response, sanitized)
 
     # 2) 원래 계산
     data = await asyncio.to_thread(fn, *args)
+    data = _sanitize_value(data)
 
     # 3) 캐시에 저장
     store_response_to_cache(request, data)
@@ -151,6 +182,8 @@ async def all_resources(request: Request, response: Response):
         "kinesis_streams": kinesis_streams,
         "msk_clusters": msk_clusters,
     }
+
+    data = _sanitize_value(data)
 
     # 3) 캐시에 저장 + 헤더
     store_response_to_cache(request, data)
