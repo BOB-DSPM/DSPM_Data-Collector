@@ -48,6 +48,8 @@ def fetch(query: str):
     with engine.connect() as conn:
         try:
             df = pd.read_sql_query(text(query), conn, params=())
+            # pandas -> dict 변환 시 NaN/NaT가 그대로 남으면 JSON 직렬화에서 ValueError 발생하므로 None으로 치환
+            df = df.where(pd.notnull(df), None)
             return df.to_dict(orient="records")
         except Exception as e:
             msg = str(e)
